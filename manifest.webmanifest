@@ -4,7 +4,7 @@
   "description": "משחק קרבות לשני טלפונים: זזים, מתגוננים, נותנים אגרופים ובעיטות.",
   "lang": "he",
   "dir": "rtl",
-  "id": "./boxing-duel",
+  "id": "./boxing-duel-game",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",
