@@ -74,6 +74,9 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .pips{display:inline-flex;gap:4px}
 .pips b{width:10px;height:10px;border-radius:50%;border:2px solid var(--gold)}
 .pips b.on{background:var(--gold)}
+#roomScore{font:500 12px var(--body);color:var(--muted);text-align:center;white-space:nowrap;margin-top:3px}
+#roomScore b{display:block;font:400 16px/1.1 var(--display);color:var(--ink);direction:ltr;unicode-bidi:isolate}
+.lead{font:500 16px var(--body);color:var(--gold);margin:0 0 10px}
 #timer{font:400 30px/1 var(--display);min-width:54px;text-align:center;text-shadow:0 2px 0 #0008;padding-top:2px}
 
 #banner{position:fixed;left:0;right:0;top:30%;text-align:center;font:400 clamp(40px,9vw,84px)/1.1 var(--display);color:#fff;
@@ -112,7 +115,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 
 <div id="hud" hidden>
   <div class="side me"><div class="name"><span id="meName">אתה</span><span class="pips" id="pipsMe"><b></b><b></b></span></div><div class="bar"><i id="hpMe"></i></div><div class="bar en"><i id="enMe"></i></div></div>
-  <div id="timer">60</div>
+  <div class="mid"><div id="timer">60</div><div id="roomScore" hidden></div></div>
   <div class="side opp"><div class="name"><span id="oppName">יריב</span><span class="pips" id="pipsOpp"><b></b><b></b></span></div><div class="bar"><i id="hpOpp"></i></div><div class="bar en"><i id="enOpp"></i></div></div>
 </div>
 <div id="banner"></div>
@@ -185,6 +188,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
   <div class="card wide">
     <h2>בחרו לוחם</h2>
     <div class="chars" id="chars"></div>
+    <p class="lead" id="selectLead" hidden></p>
     <p class="sub" id="selectWait"></p>
     <button class="btn" data-menu>לתפריט</button>
   </div>
@@ -194,6 +198,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
   <div class="card">
     <h2 id="overTitle"></h2>
     <p class="sub" id="overSub"></p>
+    <p class="lead" id="overLead" hidden></p>
     <button class="btn primary" id="againBtn">עוד קרב</button>
     <div class="row">
       <button class="btn" id="reselectBtn">החלפת לוחם</button>
@@ -217,7 +222,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 // World units: a 1000×562 arena, 60 simulation ticks a second.
 // Networking: the phone that creates the room (host) runs the whole simulation; the guest only sends its buttons
 // and draws the snapshots it gets back. Both see their own fighter on the left (the guest's view is mirrored).
-const W = 1000, H = 562, GROUND = 478, STEP = 1000 / 60;
+const W = 1000, H = 562, GROUND = 478, STEP = 1000 / 60, MAX_HP = 200;
 // h: height of the hit spark; launch: knocks the target up into the air.
 const MOVES = {
   punch:  { start: 4,  active: 4,  rec: 9,  reach: 92,  dmg: 7,  kb: 3,  stun: 16, h: -140 },
@@ -260,9 +265,10 @@ let G = null;
 let P = [];               // fireballs in flight: { x, y (height above the mat), dir, o (owner) }
 let inp = [{ held: 0, latch: 0, age: 0 }, { held: 0, latch: 0, age: 0 }];
 let outbox = [], sparks = [], texts = [], shake = 0, tick = 0;
+let score = [0, 0];       // matches won by each fighter since the room was opened (online only)
 
 function newFighter(i, en = 0) {
-  return { x: i ? 680 : 320, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, hp: 100, en, act: 'idle', t: 0,
+  return { x: i ? 680 : 320, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, hp: MAX_HP, en, act: 'idle', t: 0,
     hit: false, landed: false, chain: [], combo: 0, blk: false, walk: 0 };
 }
 
@@ -309,7 +315,10 @@ function step() {
     if (--G.t <= 0) { G.phase = 'fight'; setMsg({ k: 'fight' }, 45); }
   } else if (G.phase === 'end') {
     if (--G.t <= 0) {
-      if (Math.max(...G.wins) >= 2) { G.phase = 'over'; setMsg(null, 0); }
+      if (Math.max(...G.wins) >= 2) {
+        G.phase = 'over'; setMsg(null, 0);
+        if (role === 'host') score[G.wins[0] >= 2 ? 0 : 1]++;
+      }
       else { G.round++; startRound(); }
     }
   }
@@ -625,6 +634,7 @@ let picks = [null, null], selecting = false;
 function enterGame(r) {
   audio();
   role = r; me = r === 'guest' ? 1 : 0;
+  score = [0, 0]; // a new room starts a new count
   openSelect();
   if (matchMedia('(pointer:coarse)').matches) {
     const el = document.documentElement;
@@ -665,6 +675,8 @@ function renderSelect() {
     b.classList.toggle('mine', picks[me] === k);
     b.classList.toggle('theirs', role !== 'solo' && picks[1 - me] === k);
   });
+  const lead = leadText();
+  $('#selectLead').hidden = !lead; $('#selectLead').textContent = lead;
   const wait = $('#selectWait');
   if (role === 'solo') wait.textContent = 'המחשב יקבל לוחם אחר באקראי';
   else if (picks[me] === null) wait.textContent = picks[1 - me] === null ? 'שניכם בוחרים עכשיו' : 'היריב כבר בחר. תורך!';
@@ -774,7 +786,7 @@ function lostConn() {
 const packF = f => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10, f.face, f.hp, ACTS.indexOf(f.act), f.t, f.blk ? 1 : 0, Math.floor(f.en)];
 
 function sendSnap() {
-  send({ t: 's', f: F.map(packF), g: [G.phase, G.timer, G.round, G.wins, G.msg], b: P.map(b => [Math.round(b.x), Math.round(b.y), b.dir, b.o]), e: outbox });
+  send({ t: 's', f: F.map(packF), g: [G.phase, G.timer, G.round, G.wins, G.msg, score], b: P.map(b => [Math.round(b.x), Math.round(b.y), b.dir, b.o]), e: outbox });
   outbox = [];
 }
 
@@ -795,7 +807,8 @@ function onData(d) {
       if (f.tx === null) { f.x = a[0]; f.y = a[1]; }
       Object.assign(f, { tx: a[0], ty: a[1], face: a[2], hp: a[3], act: ACTS[a[4]], t: a[5], blk: !!a[6], en: a[7] });
     });
-    const [phase, timer, round, wins, msg] = d.g;
+    const [phase, timer, round, wins, msg, sc] = d.g;
+    score = sc;
     G = { phase, timer, round, wins, msg };
     P = d.b.map(([x, y, dir, o]) => ({ x, y, dir, o }));
     d.e.forEach(onEvent);
@@ -1056,16 +1069,28 @@ function msgText(m) {
   return '';
 }
 
+// "Who's ahead in this room", from this phone's point of view. Empty in practice.
+function leadText() {
+  if (role !== 'host' && role !== 'guest') return '';
+  const a = score[me], b = score[1 - me];
+  if (!a && !b) return '';
+  const tally = `אתה ${a} · יריב ${b}`;
+  return a > b ? `🏆 אתה מוביל בחדר: ${tally}` : a < b ? `היריב מוביל בחדר: ${tally}` : `תיקו בחדר: ${tally}`;
+}
+
 let bannerKey = '';
 function updateHud() {
   if (!role || !G || !F.length) return;
   const mine = F[me], opp = F[1 - me];
-  $('#hpMe').style.width = mine.hp + '%';
-  $('#hpOpp').style.width = opp.hp + '%';
+  $('#hpMe').style.width = mine.hp / MAX_HP * 100 + '%';
+  $('#hpOpp').style.width = opp.hp / MAX_HP * 100 + '%';
   $('#enMe').style.width = (mine.en || 0) + '%';
   $('#enOpp').style.width = (opp.en || 0) + '%';
   btnEls.s.classList.toggle('ready', (mine.en || 0) >= MOVES.dive.cost);
   $('#timer').textContent = Math.ceil(Math.max(0, G.timer) / 60);
+  const rs = $('#roomScore'), online = role === 'host' || role === 'guest';
+  rs.hidden = !online;
+  if (online) rs.innerHTML = `<b>${score[me]} : ${score[1 - me]}</b>קרבות בחדר`; // mine on the left, like the health bars
   document.querySelectorAll('#pipsMe b').forEach((b, i) => b.classList.toggle('on', G.wins[me] > i));
   document.querySelectorAll('#pipsOpp b').forEach((b, i) => b.classList.toggle('on', G.wins[1 - me] > i));
   const text = msgText(G.msg), key = text + (G.msg ? G.round : '');
@@ -1079,7 +1104,9 @@ function updateHud() {
   if (G.phase === 'over' && overEl.hidden) {
     const won = G.wins[me] > G.wins[1 - me];
     $('#overTitle').textContent = won ? 'ניצחת! 🏆' : 'הפסדת…';
-    $('#overSub').textContent = `תוצאה ${G.wins[me]}–${G.wins[1 - me]}`;
+    $('#overSub').textContent = `סיבובים: אתה ${G.wins[me]} · ${role === 'solo' ? 'מחשב' : 'יריב'} ${G.wins[1 - me]}`;
+    const lead = leadText();
+    $('#overLead').hidden = !lead; $('#overLead').textContent = lead;
     releaseAll();
     showScreen('over');
   } else if (G.phase !== 'over' && !overEl.hidden) {
