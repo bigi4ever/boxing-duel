@@ -46,6 +46,13 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .sub{color:var(--muted);margin:0 0 12px;font-size:15px;line-height:1.4}
 .btn{display:block;width:100%;font:500 17px var(--body);padding:12px 16px;margin:8px 0;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);cursor:pointer}
 .row{display:flex;gap:8px}
+.card.wide{width:min(680px,100%)}
+.chars{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:4px 0 8px}
+@media (max-width:560px){.chars{grid-template-columns:repeat(3,1fr)}}
+.char{background:#120e1c;border:2px solid var(--line);border-radius:12px;padding:4px 2px 6px;color:var(--ink);font:500 14px var(--body);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.char canvas{width:100%;max-width:90px;aspect-ratio:3/4;display:block}
+.char.mine{border-color:var(--c);box-shadow:0 0 0 2px var(--c),0 0 18px var(--c)}
+.char.theirs::after{content:'היריב';font-size:11px;color:var(--muted)}
 .btn.primary{background:var(--gold);color:#2a1d00;border-color:transparent;font-weight:700}
 .btn:active{transform:translateY(1px)}
 .btn:disabled{opacity:.6}
@@ -104,7 +111,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 <canvas id="c"></canvas>
 
 <div id="hud" hidden>
-  <div class="side me"><div class="name"><span>אתה</span><span class="pips" id="pipsMe"><b></b><b></b></span></div><div class="bar"><i id="hpMe"></i></div><div class="bar en"><i id="enMe"></i></div></div>
+  <div class="side me"><div class="name"><span id="meName">אתה</span><span class="pips" id="pipsMe"><b></b><b></b></span></div><div class="bar"><i id="hpMe"></i></div><div class="bar en"><i id="enMe"></i></div></div>
   <div id="timer">60</div>
   <div class="side opp"><div class="name"><span id="oppName">יריב</span><span class="pips" id="pipsOpp"><b></b><b></b></span></div><div class="bar"><i id="hpOpp"></i></div><div class="bar en"><i id="enOpp"></i></div></div>
 </div>
@@ -174,12 +181,24 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
   </div>
 </section>
 
+<section class="screen" id="selectScr" hidden>
+  <div class="card wide">
+    <h2>בחרו לוחם</h2>
+    <div class="chars" id="chars"></div>
+    <p class="sub" id="selectWait"></p>
+    <button class="btn" data-menu>לתפריט</button>
+  </div>
+</section>
+
 <section class="screen" id="over" hidden>
   <div class="card">
     <h2 id="overTitle"></h2>
     <p class="sub" id="overSub"></p>
     <button class="btn primary" id="againBtn">עוד קרב</button>
-    <button class="btn" data-menu>לתפריט</button>
+    <div class="row">
+      <button class="btn" id="reselectBtn">החלפת לוחם</button>
+      <button class="btn" data-menu>לתפריט</button>
+    </div>
   </div>
 </section>
 
@@ -215,7 +234,20 @@ const BIT = { l: 1, r: 2, j: 4, b: 8, p: 16, k: 32, s: 64 };
 const TAPS = BIT.j | BIT.p | BIT.k | BIT.s;
 const ACTS = ['idle', 'punch', 'kick', 'hit', 'ko', 'finish', 'fire', 'dash', 'dive', 'rec'];
 const PREFIX = 'bigi4ever-boxing-duel-';
-const COLORS = ['#ff4d5e', '#3fa8ff'];
+// Fighters to pick from. col: gloves, shorts and fireballs; alt: used when both players pick the same one.
+const CHARS = [
+  { name: 'להבה',   col: '#ff4d5e', alt: '#ff9a2e', skin: '#f1d0b5', hair: '#4a2a1a', look: 'band' },
+  { name: 'קרח',    col: '#3fa8ff', alt: '#36e0c8', skin: '#e8e2f6', hair: '#dff3ff', look: 'spiky' },
+  { name: 'רעם',    col: '#ffc94a', alt: '#ff6b3d', skin: '#8a5a3c', hair: '#1b1b1b', look: 'mohawk' },
+  { name: 'יער',    col: '#4fd17a', alt: '#2ec4ff', skin: '#c58c5c', hair: '#2b1a10', look: 'cap' },
+  { name: 'צל',     col: '#a66bff', alt: '#ff4d8b', skin: '#8f86ad', hair: '#1a1526', look: 'mask' },
+  { name: 'סוכריה', col: '#ff7ad9', alt: '#8a7dff', skin: '#f6dcc6', hair: '#ffd84a', look: 'pony' },
+];
+let chars = [0, 1];       // which character each fighter (0, 1) plays
+const charOf = i => CHARS[chars[i]];
+const colorOf = i => i === 1 && chars[0] === chars[1] ? CHARS[chars[1]].alt : CHARS[chars[i]].col;
+// Body shade for the far arm and leg.
+const shade = (hex, k) => '#' + [1, 3, 5].map(j => Math.round(parseInt(hex.slice(j, j + 2), 16) * k).toString(16).padStart(2, '0')).join('');
 const $ = s => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -512,7 +544,7 @@ function say(txt, x, y, col, size = 30, tag = null) {
 
 function onEvent(e) {
   sfx(e.k);
-  if (e.k === 'sp') { say(SPECIAL_NAMES[e.s], e.x, e.y, COLORS[e.w]); return; }
+  if (e.k === 'sp') { say(SPECIAL_NAMES[e.s], e.x, e.y, colorOf(e.w)); return; }
   if (e.k === 'fin') { say('סופר קומבו!', e.x, e.y - 30, '#ffc94a', 40); shake = 12; return; }
   sparks.push({ x: e.x, y: e.y, life: 1, k: e.k });
   if (e.k === 'blk') return;
@@ -574,7 +606,7 @@ function cleanupNet() {
 
 function toMenu() {
   cleanupNet(); releaseAll();
-  role = null; me = 0; G = null; P = [];
+  role = null; me = 0; G = null; P = []; selecting = false;
   F = [newFighter(0), newFighter(1)];
   $('#hud').hidden = $('#pad').hidden = true;
   $('#banner').textContent = '';
@@ -587,23 +619,88 @@ function netMsg(e) {
   return 'משהו השתבש בחיבור. נסו שוב.';
 }
 
+// Connected (or practice): first everyone picks a fighter, then the match starts.
+let picks = [null, null], selecting = false;
+
 function enterGame(r) {
   audio();
   role = r; me = r === 'guest' ? 1 : 0;
-  sparks = []; texts = []; outbox = []; P = [];
-  showScreen(null);
-  $('#hud').hidden = $('#pad').hidden = false;
-  $('#oppName').textContent = r === 'solo' ? 'מחשב' : 'יריב';
-  $('#hpMe').style.background = COLORS[me];
-  $('#hpOpp').style.background = COLORS[1 - me];
-  $('#enMe').style.background = $('#enOpp').style.background = '#ffc94a';
-  if (r === 'guest') { G = null; F = []; } else startMatch();
+  openSelect();
   if (matchMedia('(pointer:coarse)').matches) {
     const el = document.documentElement;
     if (!document.fullscreenElement && el.requestFullscreen) {
       el.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
     }
   }
+}
+
+function openSelect() {
+  selecting = true; G = null; P = []; picks = [null, null];
+  releaseAll();
+  $('#hud').hidden = $('#pad').hidden = true;
+  $('#banner').textContent = ''; bannerKey = '';
+  showScreen('selectScr');
+  renderSelect();
+}
+
+function renderSelect() {
+  const box = $('#chars');
+  if (!box.children.length) {
+    CHARS.forEach((c, k) => {
+      const b = document.createElement('button');
+      b.className = 'char'; b.style.setProperty('--c', c.col);
+      b.innerHTML = '<canvas width="180" height="240"></canvas><span></span>';
+      b.lastChild.textContent = c.name;
+      b.onclick = () => pick(k);
+      box.appendChild(b);
+      const saved = ctx, saveChars = chars;
+      ctx = b.firstChild.getContext('2d');
+      chars = [k, k];
+      ctx.setTransform(1.15, 0, 0, 1.15, 90 - 320 * 1.15, 232 - GROUND * 1.15);
+      drawFighter(newFighter(0), 0, 0);
+      ctx = saved; chars = saveChars;
+    });
+  }
+  [...box.children].forEach((b, k) => {
+    b.classList.toggle('mine', picks[me] === k);
+    b.classList.toggle('theirs', role !== 'solo' && picks[1 - me] === k);
+  });
+  const wait = $('#selectWait');
+  if (role === 'solo') wait.textContent = 'המחשב יקבל לוחם אחר באקראי';
+  else if (picks[me] === null) wait.textContent = picks[1 - me] === null ? 'שניכם בוחרים עכשיו' : 'היריב כבר בחר. תורך!';
+  else wait.textContent = 'מחכים שהיריב יבחר…';
+}
+
+function pick(k) {
+  if (role === 'solo') {
+    const others = CHARS.map((_, j) => j).filter(j => j !== k);
+    chars = [k, others[Math.floor(Math.random() * others.length)]];
+    beginMatch(); return;
+  }
+  picks[me] = k;
+  send({ t: 'pick', c: k });
+  renderSelect();
+  if (role === 'host') tryStart();
+}
+
+function tryStart() {
+  if (picks[0] === null || picks[1] === null) return;
+  chars = [...picks];
+  send({ t: 'go', c: chars });
+  beginMatch();
+}
+
+function beginMatch() {
+  selecting = false;
+  sparks = []; texts = []; outbox = []; P = [];
+  showScreen(null);
+  $('#hud').hidden = $('#pad').hidden = false;
+  $('#meName').textContent = 'אתה · ' + charOf(me).name;
+  $('#oppName').textContent = (role === 'solo' ? 'מחשב' : 'יריב') + ' · ' + charOf(1 - me).name;
+  $('#hpMe').style.background = colorOf(me);
+  $('#hpOpp').style.background = colorOf(1 - me);
+  $('#enMe').style.background = $('#enOpp').style.background = '#ffc94a';
+  if (role === 'guest') { G = null; F = []; } else startMatch();
 }
 
 function createRoom() {
@@ -668,7 +765,7 @@ function wireConn(c) {
 function lostConn() {
   if (role !== 'host' && role !== 'guest') return;
   cleanupNet(); releaseAll();
-  role = null; G = null; P = []; F = [newFighter(0), newFighter(1)]; me = 0;
+  role = null; G = null; P = []; F = [newFighter(0), newFighter(1)]; me = 0; selecting = false;
   $('#hud').hidden = $('#pad').hidden = true;
   $('#banner').textContent = '';
   showScreen('lost');
@@ -682,10 +779,16 @@ function sendSnap() {
 }
 
 function onData(d) {
+  if (d.t === 'reselect') { if (!selecting) openSelect(); return; }
   if (role === 'host') {
     if (d.t === 'in') setHeld(1, d.h | 0);
     else if (d.t === 'again' && G && G.phase === 'over') startMatch();
-  } else if (role === 'guest' && d.t === 's') {
+    else if (d.t === 'pick' && selecting) { picks[1] = d.c | 0; renderSelect(); tryStart(); }
+  } else if (role === 'guest' && d.t === 'pick') {
+    picks[0] = d.c; renderSelect();
+  } else if (role === 'guest' && d.t === 'go') {
+    chars = d.c; beginMatch();
+  } else if (role === 'guest' && d.t === 's' && !selecting) {
     if (!F.length) F = [newFighter(0), newFighter(1)].map(f => Object.assign(f, { tx: null }));
     d.f.forEach((a, i) => {
       const f = F[i];
@@ -705,11 +808,13 @@ $('#joinBtn').onclick = joinRoom;
 $('#codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
 $('#soloBtn').onclick = () => { cleanupNet(); enterGame('solo'); };
 $('#againBtn').onclick = () => { if (role === 'guest') send({ t: 'again' }); else if (role) startMatch(); };
+$('#reselectBtn').onclick = () => { send({ t: 'reselect' }); openSelect(); };
 document.querySelectorAll('[data-menu]').forEach(b => { b.onclick = toMenu; });
 document.querySelectorAll('[data-screen]').forEach(b => { b.onclick = () => showScreen(b.dataset.screen); });
 
 // ---------- drawing ----------
-const cv = $('#c'), ctx = cv.getContext('2d');
+const cv = $('#c');
+let ctx = cv.getContext('2d'); // swapped briefly to draw the character previews
 let cw = 0, ch = 0, dpr = 1;
 const crowd = Array.from({ length: 140 }, (_, i) => ({
   x: -420 + ((i * 97) % 1840), y: 250 + (i % 4) * 26 + ((i * 13) % 9), r: 11 + (i % 3) * 2, c: (i * 37) % 5,
@@ -795,8 +900,52 @@ function pose(f, now) {
   return { lean, bob, ff, bf, fg, bg };
 }
 
+// Head in the fighter's own frame (facing +x), with each character's look.
+function drawHead(ch, col, x, y) {
+  const hair = ch.hair;
+  if (ch.look === 'pony') { // ponytail behind the head
+    ctx.strokeStyle = hair; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.moveTo(x - 12, y - 10); ctx.quadraticCurveTo(x - 34, y - 6, x - 30, y + 18); ctx.stroke();
+  }
+  ctx.fillStyle = ch.skin;
+  ctx.beginPath(); ctx.arc(x, y, 17, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = hair;
+  switch (ch.look) {
+    case 'band':
+      ctx.beginPath(); ctx.arc(x, y, 17, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+      ctx.fillStyle = col; ctx.fillRect(x - 17, y - 9, 34, 6);
+      ctx.beginPath(); ctx.moveTo(x - 16, y - 8); ctx.lineTo(x - 30, y - 14); ctx.lineTo(x - 28, y - 2); ctx.fill();
+      break;
+    case 'spiky':
+      ctx.beginPath(); ctx.moveTo(x - 18, y - 4);
+      [[-20, -24], [-10, -14], [-6, -32], [2, -16], [8, -30], [12, -14], [20, -20], [17, -6]].forEach(([a, b]) => ctx.lineTo(x + a, y + b));
+      ctx.closePath(); ctx.fill();
+      break;
+    case 'mohawk':
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(x - 12, y - 12); ctx.quadraticCurveTo(x - 4, y - 40, x + 12, y - 14); ctx.closePath(); ctx.fill();
+      break;
+    case 'cap':
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(x, y - 3, 18, Math.PI, 0); ctx.fill();
+      ctx.fillRect(x, y - 6, 28, 5);
+      break;
+    case 'mask':
+      ctx.beginPath(); ctx.arc(x, y, 17.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = ch.skin; ctx.fillRect(x - 2, y - 5, 19, 7);
+      ctx.fillStyle = col; ctx.fillRect(x - 17, y - 11, 34, 4);
+      break;
+    case 'pony':
+      ctx.beginPath(); ctx.arc(x, y - 1, 17.5, Math.PI * 0.9, Math.PI * 2.02); ctx.fill();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x - 13, y - 9, 4.5, 0, Math.PI * 2); ctx.fill();
+      break;
+  }
+  ctx.fillStyle = '#14101f';
+  ctx.beginPath(); ctx.arc(x + 8, y - 1, 2.6, 0, Math.PI * 2); ctx.fill();
+}
+
 function drawFighter(f, i, now) {
-  const col = COLORS[i];
+  const col = colorOf(i), ch = charOf(i), skin = ch.skin;
   // shadow
   ctx.fillStyle = '#0006';
   ctx.beginPath(); ctx.ellipse(f.x, GROUND + 4, 38 * (1 - Math.min(f.y / 300, 0.5)), 8, 0, 0, Math.PI * 2); ctx.fill();
@@ -810,25 +959,21 @@ function drawFighter(f, i, now) {
   ctx.lineCap = ctx.lineJoin = 'round';
 
   // back limbs, darker
-  ctx.strokeStyle = '#a99cc8'; ctx.lineWidth = 12;
+  ctx.strokeStyle = shade(skin, 0.75); ctx.lineWidth = 12;
   limb(hip, P.bf, 40, [1, 0]);
   ctx.lineWidth = 10; limb([sho[0] - 4, sho[1]], P.bg, 36, [0, 1]);
   ctx.fillStyle = col; ctx.globalAlpha = 0.75;
   ctx.beginPath(); ctx.arc(P.bg[0], P.bg[1], 11, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
 
   // torso, shorts, head
-  ctx.strokeStyle = '#e8e2f6'; ctx.lineWidth = 26;
+  ctx.strokeStyle = skin; ctx.lineWidth = 26;
   ctx.beginPath(); ctx.moveTo(hip[0], hip[1]); ctx.lineTo(sho[0], sho[1]); ctx.stroke();
   ctx.fillStyle = col;
   ctx.beginPath(); ctx.roundRect(hip[0] - 17, hip[1] - 12, 34, 30, 6); ctx.fill();
-  ctx.fillStyle = '#e8e2f6';
-  ctx.beginPath(); ctx.arc(head[0], head[1], 17, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = col; ctx.fillRect(head[0] - 17, head[1] - 9, 34, 6);
-  ctx.fillStyle = '#14101f';
-  ctx.beginPath(); ctx.arc(head[0] + 8, head[1] - 1, 2.6, 0, Math.PI * 2); ctx.fill();
+  drawHead(ch, col, head[0], head[1]);
 
   // front limbs
-  ctx.strokeStyle = '#e8e2f6'; ctx.lineWidth = 12;
+  ctx.strokeStyle = skin; ctx.lineWidth = 12;
   limb(hip, P.ff, 40, [1, 0]);
   ctx.lineWidth = 10; limb(sho, P.fg, 36, [0, 1]);
   ctx.fillStyle = col;
@@ -876,7 +1021,7 @@ function drawSparks(dt) {
 function drawBalls(dt) {
   for (const b of P) {
     if (role === 'guest') b.x += b.dir * 9 * dt / STEP; // between snapshots
-    const x = b.x, y = GROUND - b.y, col = COLORS[b.o];
+    const x = b.x, y = GROUND - b.y, col = colorOf(b.o);
     ctx.fillStyle = col; ctx.globalAlpha = 0.25;
     ctx.beginPath(); ctx.ellipse(x - b.dir * 22, y, 34, 16, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
