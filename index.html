@@ -45,6 +45,7 @@ h1 .r{color:var(--red)} h1 .b{color:var(--blue)}
 h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .sub{color:var(--muted);margin:0 0 12px;font-size:15px;line-height:1.4}
 .btn{display:block;width:100%;font:500 17px var(--body);padding:12px 16px;margin:8px 0;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);cursor:pointer}
+.row{display:flex;gap:8px}
 .btn.primary{background:var(--gold);color:#2a1d00;border-color:transparent;font-weight:700}
 .btn:active{transform:translateY(1px)}
 .btn:disabled{opacity:.6}
@@ -61,6 +62,8 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .bar{height:16px;border-radius:8px;background:#0007;border:2px solid #fff3;overflow:hidden}
 .bar i{display:block;height:100%;width:100%;transition:width .15s}
 .opp .bar{transform:scaleX(-1)}
+.bar.en{height:8px;margin-top:3px;border-width:1px;width:70%}
+.opp .bar.en{margin-left:auto}
 .pips{display:inline-flex;gap:4px}
 .pips b{width:10px;height:10px;border-radius:50%;border:2px solid var(--gold)}
 .pips b.on{background:var(--gold)}
@@ -83,6 +86,13 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .k.punch{border-color:var(--red)}
 .k.kick{border-color:var(--gold)}
 .k.block{border-color:var(--blue)}
+.k.special{opacity:.45;border-style:dashed}
+.k.special.ready{opacity:1;border-style:solid;border-color:var(--gold);box-shadow:0 0 18px #ffc94a88}
+#movesScr .card{width:min(660px,100%)}
+.moves{text-align:right;margin:0 0 6px;padding:0;list-style:none;font-size:15px;line-height:1.45}
+.moves li{padding:6px 0;border-bottom:1px solid var(--line)}
+.moves b{color:var(--gold);font-weight:500}
+.moves small{color:var(--muted)}
 
 #rotate{display:none;position:fixed;inset:0;z-index:50;background:var(--bg);align-items:center;justify-content:center;text-align:center;padding:24px;font:500 20px var(--body)}
 #rotate span{display:block;font-size:56px;margin-bottom:10px}
@@ -94,9 +104,9 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 <canvas id="c"></canvas>
 
 <div id="hud" hidden>
-  <div class="side me"><div class="name"><span>אתה</span><span class="pips" id="pipsMe"><b></b><b></b></span></div><div class="bar"><i id="hpMe"></i></div></div>
+  <div class="side me"><div class="name"><span>אתה</span><span class="pips" id="pipsMe"><b></b><b></b></span></div><div class="bar"><i id="hpMe"></i></div><div class="bar en"><i id="enMe"></i></div></div>
   <div id="timer">60</div>
-  <div class="side opp"><div class="name"><span id="oppName">יריב</span><span class="pips" id="pipsOpp"><b></b><b></b></span></div><div class="bar"><i id="hpOpp"></i></div></div>
+  <div class="side opp"><div class="name"><span id="oppName">יריב</span><span class="pips" id="pipsOpp"><b></b><b></b></span></div><div class="bar"><i id="hpOpp"></i></div><div class="bar en"><i id="enOpp"></i></div></div>
 </div>
 <div id="banner"></div>
 
@@ -108,6 +118,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
   </div>
   <div class="cluster">
     <button class="k block" data-k="b"><span>🛡️</span>הגנה</button>
+    <button class="k special up" data-k="s"><span>⚡</span>מיוחד</button>
     <button class="k big punch up" data-k="p"><span>👊</span>אגרוף</button>
     <button class="k big kick" data-k="k"><span>🦵</span>בעיטה</button>
   </div>
@@ -119,8 +130,26 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
     <p class="sub">שני טלפונים, שני לוחמים. מי שמנצח בשני סיבובים לוקח את הקרב.</p>
     <button class="btn primary" id="createBtn">צור חדר</button>
     <button class="btn" id="toJoinBtn">הצטרף עם קוד</button>
-    <button class="btn" id="soloBtn">אימון נגד המחשב</button>
-    <p class="keys">במחשב: A/D תזוזה · W קפיצה · S הגנה · J אגרוף · K בעיטה</p>
+    <div class="row">
+      <button class="btn" id="soloBtn">אימון נגד המחשב</button>
+      <button class="btn" data-screen="movesScr">מכות מיוחדות</button>
+    </div>
+    <p class="keys">במחשב: A/D תזוזה · W קפיצה · S הגנה · J אגרוף · K בעיטה · L מיוחד</p>
+  </div>
+</section>
+
+<section class="screen" id="movesScr" hidden>
+  <div class="card">
+    <h2>מכות מיוחדות וקומבו</h2>
+    <p class="sub">מכות ממלאות את פס האנרגיה הצהוב (גם כשחוטפים). כשיש מספיק אנרגיה, כפתור ⚡ נדלק.</p>
+    <ul class="moves">
+      <li><b>🔥 כדור אש</b>: ⚡ בעמידה. <small>35 אנרגיה. אפשר לקפוץ מעליו.</small></li>
+      <li><b>🚀 אפרקאט רקטה</b>: מחזיקים ▶ לכיוון היריב ולוחצים ⚡. <small>35 אנרגיה. מעיף את היריב לאוויר.</small></li>
+      <li><b>🌀 בעיטת צלילה</b>: ⚡ באמצע קפיצה. <small>25 אנרגיה.</small></li>
+      <li><b>💥 סופר קומבו</b>: 👊 👊 🦵 ברצף, כשהאגרופים פוגעים. <small>הבעיטה האחרונה חזקה ומעיפה.</small></li>
+      <li><b>⚡ ביטול לתוך מיוחד</b>: אחרי כל מכה שפגעה אפשר ללחוץ ⚡ והמיוחד יוצא מיד, בלי הפסקה.</li>
+    </ul>
+    <button class="btn primary" data-menu>הבנתי</button>
   </div>
 </section>
 
@@ -170,13 +199,21 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 // Networking: the phone that creates the room (host) runs the whole simulation; the guest only sends its buttons
 // and draws the snapshots it gets back. Both see their own fighter on the left (the guest's view is mirrored).
 const W = 1000, H = 562, GROUND = 478, STEP = 1000 / 60;
+// h: height of the hit spark; launch: knocks the target up into the air.
 const MOVES = {
-  punch: { start: 4, active: 4, rec: 9,  reach: 92,  dmg: 7,  kb: 5, stun: 13, h: -140 },
-  kick:  { start: 9, active: 5, rec: 15, reach: 124, dmg: 12, kb: 9, stun: 18, h: -88 },
+  punch:  { start: 4,  active: 4,  rec: 9,  reach: 92,  dmg: 7,  kb: 3,  stun: 16, h: -140 },
+  kick:   { start: 9,  active: 5,  rec: 15, reach: 124, dmg: 12, kb: 8,  stun: 18, h: -88 },
+  finish: { start: 7,  active: 5,  rec: 18, reach: 128, dmg: 16, kb: 9,  stun: 30, h: -110, launch: 10 },
+  fire:   { start: 10, active: 1,  rec: 18, cost: 35 },
+  dash:   { start: 6,  active: 14, rec: 18, reach: 74,  dmg: 15, kb: 4,  stun: 30, h: -170, launch: 12, cost: 35 },
+  dive:   {                                 reach: 76,  dmg: 10, kb: 6,  stun: 18, h: -30, cost: 25 },
+  ball:   {                                               dmg: 12, kb: 7,  stun: 20, chip: 3 },
 };
-const BIT = { l: 1, r: 2, j: 4, b: 8, p: 16, k: 32 };
-const TAPS = BIT.j | BIT.p | BIT.k;
-const ACTS = ['idle', 'punch', 'kick', 'hit', 'ko'];
+const SPECIAL_NAMES = { fire: 'כדור אש!', dash: 'אפרקאט רקטה!', dive: 'בעיטת צלילה!' };
+const ATTACKS = ['punch', 'kick', 'finish', 'fire', 'dash'];
+const BIT = { l: 1, r: 2, j: 4, b: 8, p: 16, k: 32, s: 64 };
+const TAPS = BIT.j | BIT.p | BIT.k | BIT.s;
+const ACTS = ['idle', 'punch', 'kick', 'hit', 'ko', 'finish', 'fire', 'dash', 'dive', 'rec'];
 const PREFIX = 'bigi4ever-boxing-duel-';
 const COLORS = ['#ff4d5e', '#3fa8ff'];
 const $ = s => document.querySelector(s);
@@ -188,11 +225,13 @@ let me = 0;               // which fighter is mine: host/solo 0, guest 1
 let peer = null, conn = null;
 let F = [newFighter(0), newFighter(1)];
 let G = null;
+let P = [];               // fireballs in flight: { x, y (height above the mat), dir, o (owner) }
 let inp = [{ held: 0, latch: 0, age: 0 }, { held: 0, latch: 0, age: 0 }];
-let outbox = [], sparks = [], shake = 0, tick = 0;
+let outbox = [], sparks = [], texts = [], shake = 0, tick = 0;
 
-function newFighter(i) {
-  return { x: i ? 680 : 320, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, hp: 100, act: 'idle', t: 0, hit: false, blk: false, walk: 0 };
+function newFighter(i, en = 0) {
+  return { x: i ? 680 : 320, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, hp: 100, en, act: 'idle', t: 0,
+    hit: false, landed: false, chain: [], combo: 0, blk: false, walk: 0 };
 }
 
 // ---------- simulation (host and solo only) ----------
@@ -204,11 +243,13 @@ function setHeld(i, bits) {
 
 function startMatch() {
   G = { phase: 'intro', t: 0, round: 1, wins: [0, 0], timer: 3600, msg: null, msgT: 0 };
+  F = [newFighter(0), newFighter(1)];
   startRound();
 }
 
 function startRound() {
-  F = [newFighter(0), newFighter(1)];
+  F = [newFighter(0, F[0].en), newFighter(1, F[1].en)]; // energy carries over between rounds
+  P = [];
   inp = [{ held: inp[0].held, latch: 0, age: 0 }, { held: inp[1].held, latch: 0, age: 0 }];
   Object.assign(G, { phase: 'intro', t: 100, timer: 3600 });
   setMsg({ k: 'round', n: G.round }, 60);
@@ -223,10 +264,11 @@ function step() {
   for (let i = 0; i < 2; i++) {
     const held = fight ? inp[i].held : 0, latch = fight ? inp[i].latch : 0;
     // A tap made while still busy (hit, mid-attack) is kept for a few ticks so it isn't lost.
-    if (updateFighter(F[i], F[1 - i], held, latch) || !fight || ++inp[i].age > 8) { inp[i].latch = 0; inp[i].age = 0; }
+    if (updateFighter(F[i], F[1 - i], held, latch) || !fight || ++inp[i].age > 10) { inp[i].latch = 0; inp[i].age = 0; }
   }
   separate();
   checkHit(0); checkHit(1);
+  moveBalls();
 
   if (G.phase === 'fight') {
     G.timer--;
@@ -249,25 +291,72 @@ function gravity(f) {
   }
 }
 
+function startAttack(f, kind) {
+  f.act = kind; f.t = 0; f.hit = false; f.landed = false; f.blk = false;
+  f.chain.push(kind);
+  if (kind === 'punch') f.vx = f.face * 2;
+}
+
+// ⚡: in the air → dive kick; holding toward the opponent → rocket uppercut; otherwise → fireball.
+function special(f, held) {
+  const toward = f.face > 0 ? BIT.r : BIT.l;
+  const kind = f.y > 0 ? 'dive' : held & toward ? 'dash' : 'fire';
+  const i = F.indexOf(f);
+  if (f.en < MOVES[kind].cost) return false;
+  if (kind === 'fire' && P.some(b => b.o === i)) return false;
+  f.en -= MOVES[kind].cost;
+  startAttack(f, kind);
+  if (kind === 'dive') { f.vy = -8; f.vx = f.face * 10; }
+  emit({ k: 'sp', w: i, s: kind, x: f.x, y: GROUND - f.y - 200 });
+  return true;
+}
+
+// After a hit lands: punch → punch → kick (the kick becomes the super finisher), and any landed hit can go into a special.
+function tryCancel(f, held, latch) {
+  if (!f.landed) return false;
+  if (latch & BIT.s) return special(f, held);
+  if (f.act !== 'punch') return false;
+  const punches = f.chain.filter(k => k === 'punch').length;
+  if ((latch & BIT.p) && punches < 2) { startAttack(f, 'punch'); return true; }
+  if (latch & BIT.k) { startAttack(f, punches >= 2 ? 'finish' : 'kick'); return true; }
+  return false;
+}
+
 function updateFighter(f, o, held, latch) {
   const onGround = f.y <= 0;
   if (f.act === 'ko') { f.t++; f.x += f.vx; f.vx *= 0.9; gravity(f); return true; }
-  if (f.act === 'hit') { f.x += f.vx; f.vx *= 0.85; if (--f.t <= 0) f.act = 'idle'; gravity(f); return false; }
-  if (f.act === 'punch' || f.act === 'kick') {
+  if (f.act === 'hit') {
+    f.x += f.vx; f.vx *= 0.85;
+    if (--f.t <= 0 && f.y <= 0) f.act = 'idle';
+    gravity(f); return false;
+  }
+  if (f.act === 'rec') { if (--f.t <= 0) f.act = 'idle'; return false; }
+  if (f.act === 'dive') {
+    f.x += f.vx; gravity(f);
+    if (f.y <= 0) { f.act = 'rec'; f.t = 12; f.vx = 0; }
+    return false;
+  }
+  if (ATTACKS.includes(f.act)) {
+    if (latch & (BIT.p | BIT.k | BIT.s) && tryCancel(f, held, latch)) return true;
     const m = MOVES[f.act];
-    if (++f.t >= m.start + m.active + m.rec) f.act = 'idle';
+    f.t++;
+    if (f.act === 'fire' && f.t === m.start) P.push({ x: f.x + f.face * 55, y: f.y + 105, dir: f.face, o: F.indexOf(f) });
+    if (f.t >= m.start + m.active + m.rec) f.act = 'idle';
     if (onGround) f.vx *= 0.7;
+    if (f.act === 'dash' && f.t >= m.start && f.t < m.start + m.active) { f.vx = f.face * 9; if (f.t === m.start) f.vy = 4; }
     f.x += f.vx; gravity(f); return false;
   }
   f.face = o.x >= f.x ? 1 : -1;
   f.blk = !!(held & BIT.b) && onGround;
-  if (latch & BIT.p) { f.act = 'punch'; f.t = 0; f.hit = false; f.blk = false; }
-  else if (latch & BIT.k) { f.act = 'kick'; f.t = 0; f.hit = false; f.blk = false; }
+  if (latch & (BIT.p | BIT.k | BIT.s)) f.chain = [];
+  if ((latch & BIT.s) && special(f, held)) { /* special started */ }
+  else if (latch & BIT.p) startAttack(f, 'punch');
+  else if (latch & BIT.k) startAttack(f, 'kick');
   else if ((latch & BIT.j) && onGround && !f.blk) f.vy = 15;
   let dir = ((held & BIT.r) ? 1 : 0) - ((held & BIT.l) ? 1 : 0);
   if (f.blk || f.act !== 'idle') dir = 0;
-  if (onGround) f.vx = dir * 4.6;
-  f.x += f.vx;
+  if (onGround && f.act === 'idle') f.vx = dir * 4.6;
+  if (f.act === 'idle') f.x += f.vx;
   gravity(f);
   return true;
 }
@@ -285,25 +374,60 @@ function separate() {
   if (b.x < 50 || b.x > W - 50) { b.x = clamp(b.x, 50, W - 50); a.x = b.x - s * min; }
 }
 
+function gain(f, n) { f.en = Math.min(100, f.en + n); }
+
 function checkHit(i) {
   const f = F[i], o = F[1 - i];
-  if ((f.act !== 'punch' && f.act !== 'kick') || f.hit || o.act === 'ko') return;
-  const m = MOVES[f.act];
-  if (f.t < m.start || f.t >= m.start + m.active) return;
+  if (f.hit || o.act === 'ko') return;
+  let m;
+  if (f.act === 'dive') m = MOVES.dive;
+  else if (ATTACKS.includes(f.act) && f.act !== 'fire') {
+    m = MOVES[f.act];
+    if (f.t < m.start || f.t >= m.start + m.active) return;
+  } else return;
   const dx = (o.x - f.x) * f.face;
-  if (dx < 0 || dx > m.reach || Math.abs(o.y - f.y) > 80) return;
+  if (dx < -10 || dx > m.reach || Math.abs(o.y - f.y) > 90) return;
   f.hit = true;
   const x = f.x + f.face * Math.max(30, dx - 22), y = GROUND - f.y + m.h;
-  if (o.blk && o.face === -f.face) {
-    o.hp = Math.max(1, o.hp - 1);
-    o.x += f.face * m.kb * 2;
+  f.landed = applyHit(i, m, x, y, f.face);
+  if (f.landed && f.act === 'finish') emit({ k: 'fin', w: i, x: o.x, y: GROUND - o.y - 230 });
+}
+
+// Damage, knockback, energy and the combo count, for every kind of hit. Returns true if it wasn't blocked.
+function applyHit(i, m, x, y, dir) {
+  const f = F[i], o = F[1 - i];
+  if (o.blk && o.face === -dir) {
+    o.hp = Math.max(1, o.hp - (m.chip || 1));
+    o.x += dir * m.kb * 2;
+    gain(f, 2); gain(o, 4);
     emit({ k: 'blk', w: 1 - i, x, y });
-    return;
+    return false;
   }
-  o.hp = Math.max(0, o.hp - m.dmg);
-  o.act = 'hit'; o.t = m.stun; o.blk = false; o.vx = f.face * m.kb;
-  if (o.hp <= 0) { o.act = 'ko'; o.t = 0; o.vx = f.face * 7; o.vy = Math.max(o.vy, 7); }
-  emit({ k: o.hp <= 0 ? 'ko' : 'hit', w: 1 - i, x, y });
+  o.combo = o.act === 'hit' ? o.combo + 1 : 1;
+  const dmg = Math.round(m.dmg * (o.combo > 3 ? 0.7 : 1)); // long combos hurt a bit less each hit
+  o.hp = Math.max(0, o.hp - dmg);
+  o.act = 'hit'; o.t = m.stun; o.blk = false; o.vx = dir * m.kb;
+  if (m.launch) o.vy = Math.max(o.vy, m.launch);
+  else if (o.y > 0) o.vy = Math.max(o.vy, 3); // juggled: a little float keeps the combo going
+  gain(f, 8); gain(o, 5);
+  if (o.hp <= 0) { o.act = 'ko'; o.t = 0; o.vx = dir * 7; o.vy = Math.max(o.vy, 7); }
+  emit({ k: o.hp <= 0 ? 'ko' : 'hit', w: 1 - i, x, y, n: o.combo, big: !!m.launch });
+  return true;
+}
+
+function moveBalls() {
+  for (const b of P) b.x += b.dir * 9;
+  if (P.length === 2 && P[0].dir !== P[1].dir && Math.abs(P[0].x - P[1].x) < 34) {
+    emit({ k: 'clash', x: (P[0].x + P[1].x) / 2, y: GROUND - P[0].y });
+    P = []; return;
+  }
+  P = P.filter(b => {
+    if (b.x < -40 || b.x > W + 40) return false;
+    const o = F[1 - b.o];
+    if (o.act === 'ko' || Math.abs(o.x - b.x) > 36 || b.y < o.y + 10 || b.y > o.y + 170) return true;
+    applyHit(b.o, MOVES.ball, b.x, GROUND - b.y, b.dir);
+    return false;
+  });
 }
 
 function endRound() {
@@ -321,18 +445,27 @@ function emit(e) {
   if (role === 'host') outbox.push(e);
 }
 
-// Practice opponent: walks in, mixes punches and kicks, sometimes blocks.
-const bot = { cd: 30, blk: 0 };
+// Practice opponent: walks in, mixes punches and kicks, finishes combos, throws fireballs, sometimes blocks.
+const bot = { cd: 30, blk: 0, used: 0 };
 function botBits(b, p) {
   if (bot.blk > 0) { bot.blk--; return BIT.b; }
   const dx = p.x - b.x, d = Math.abs(dx);
   const toward = dx > 0 ? BIT.r : BIT.l, away = dx > 0 ? BIT.l : BIT.r;
-  if ((p.act === 'punch' || p.act === 'kick') && p.t < 4 && d < 140 && Math.random() < 0.12) { bot.blk = 18; return BIT.b; }
+  if (b.landed && b.act === 'punch' && bot.used !== b.chain.length) {
+    bot.used = b.chain.length;
+    if (Math.random() < 0.6) return b.chain.length < 2 ? BIT.p : BIT.k;
+  }
+  if ((p.act === 'punch' || p.act === 'kick' || p.act === 'dash') && p.t < 4 && d < 140 && Math.random() < 0.12) { bot.blk = 18; return BIT.b; }
+  if (P.some(f => f.o === 0 && f.dir * (b.x - f.x) > 0 && Math.abs(b.x - f.x) < 160) && Math.random() < 0.08) return BIT.j;
   let h = 0;
   if (d > 105) h |= toward; else if (d < 66 && Math.random() < 0.5) h |= away;
-  if (--bot.cd <= 0 && d < 130) {
-    h |= d < 95 && Math.random() < 0.7 ? BIT.p : BIT.k;
-    bot.cd = 28 + Math.floor(Math.random() * 45);
+  if (--bot.cd <= 0) {
+    if (d > 260 && b.en >= 35 && Math.random() < 0.5) { h = BIT.s; bot.cd = 60; }
+    else if (d < 110 && b.en >= 60 && Math.random() < 0.25) { h = toward | BIT.s; bot.cd = 60; }
+    else if (d < 130) {
+      h |= d < 95 && Math.random() < 0.7 ? BIT.p : BIT.k;
+      bot.cd = 28 + Math.floor(Math.random() * 45);
+    } else bot.cd = 0;
   }
   if (Math.random() < 0.004) h |= BIT.j;
   return h;
@@ -362,29 +495,40 @@ function tone(type, f0, f1, dur, vol) {
 function sfx(k) {
   if (!ac) return;
   if (k === 'blk') { tone('square', 900, 420, 0.06, 0.08); return; }
+  if (k === 'sp') { tone('sawtooth', 220, 880, 0.22, 0.12); return; }
+  if (k === 'fin') { tone('square', 330, 990, 0.3, 0.12); return; }
   tone('triangle', k === 'ko' ? 160 : 200, 45, k === 'ko' ? 0.5 : 0.14, 0.5);
   const s = ac.createBufferSource(), g = ac.createGain();
   s.buffer = noiseBuf; g.gain.value = 0.25;
   s.connect(g).connect(ac.destination); s.start();
 }
 
+// Floating words (special names, combo counts) are drawn unmirrored, so they read correctly on both phones.
+// RLM marks keep the "!" at the end of Hebrew text on canvas. A tagged text replaces the previous one (the combo counter).
+function say(txt, x, y, col, size = 30, tag = null) {
+  if (tag) texts = texts.filter(t => t.tag !== tag);
+  texts.push({ txt: '\u200F' + txt + '\u200F', x, y, col, size, tag, life: 1 });
+}
+
 function onEvent(e) {
-  sparks.push({ x: e.x, y: e.y, life: 1, k: e.k });
   sfx(e.k);
-  if (e.k !== 'blk') {
-    shake = e.k === 'ko' ? 16 : 6;
-    if (e.w === me && navigator.vibrate) navigator.vibrate(e.k === 'ko' ? 220 : 40);
-  }
+  if (e.k === 'sp') { say(SPECIAL_NAMES[e.s], e.x, e.y, COLORS[e.w]); return; }
+  if (e.k === 'fin') { say('סופר קומבו!', e.x, e.y - 30, '#ffc94a', 40); shake = 12; return; }
+  sparks.push({ x: e.x, y: e.y, life: 1, k: e.k });
+  if (e.k === 'blk') return;
+  shake = e.k === 'ko' ? 16 : e.big ? 10 : 6;
+  if (e.n >= 2) say(e.n + ' מכות!', e.x, e.y - 60, '#ffc94a', 22 + Math.min(e.n, 6) * 3, 'combo' + e.w);
+  if (e.w === me && navigator.vibrate) navigator.vibrate(e.k === 'ko' ? 220 : e.big ? 90 : 40);
 }
 
 // ---------- input ----------
-const held = { l: 0, r: 0, j: 0, b: 0, p: 0, k: 0 };
+const held = { l: 0, r: 0, j: 0, b: 0, p: 0, k: 0, s: 0 };
 const btnEls = {};
 
 function myBits() {
   let l = held.l, r = held.r;
   if (me === 1) [l, r] = [r, l]; // mirrored view: the button on the left of the screen walks toward world +x
-  return (l && BIT.l) | (r && BIT.r) | (held.j && BIT.j) | (held.b && BIT.b) | (held.p && BIT.p) | (held.k && BIT.k);
+  return (l && BIT.l) | (r && BIT.r) | (held.j && BIT.j) | (held.b && BIT.b) | (held.p && BIT.p) | (held.k && BIT.k) | (held.s && BIT.s);
 }
 
 function press(key, v) {
@@ -411,7 +555,7 @@ document.querySelectorAll('.k').forEach(el => {
 });
 document.addEventListener('contextmenu', e => e.preventDefault());
 
-const KEYS = { KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r', KeyW: 'j', ArrowUp: 'j', Space: 'j', KeyS: 'b', ArrowDown: 'b', KeyJ: 'p', KeyK: 'k' };
+const KEYS = { KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r', KeyW: 'j', ArrowUp: 'j', Space: 'j', KeyS: 'b', ArrowDown: 'b', KeyJ: 'p', KeyK: 'k', KeyL: 's' };
 addEventListener('keydown', e => { if (KEYS[e.code] && role && e.target.tagName !== 'INPUT') { e.preventDefault(); press(KEYS[e.code], 1); } });
 addEventListener('keyup', e => { if (KEYS[e.code]) press(KEYS[e.code], 0); });
 addEventListener('blur', releaseAll);
@@ -430,7 +574,7 @@ function cleanupNet() {
 
 function toMenu() {
   cleanupNet(); releaseAll();
-  role = null; me = 0; G = null;
+  role = null; me = 0; G = null; P = [];
   F = [newFighter(0), newFighter(1)];
   $('#hud').hidden = $('#pad').hidden = true;
   $('#banner').textContent = '';
@@ -446,12 +590,13 @@ function netMsg(e) {
 function enterGame(r) {
   audio();
   role = r; me = r === 'guest' ? 1 : 0;
-  sparks = []; outbox = [];
+  sparks = []; texts = []; outbox = []; P = [];
   showScreen(null);
   $('#hud').hidden = $('#pad').hidden = false;
   $('#oppName').textContent = r === 'solo' ? 'מחשב' : 'יריב';
   $('#hpMe').style.background = COLORS[me];
   $('#hpOpp').style.background = COLORS[1 - me];
+  $('#enMe').style.background = $('#enOpp').style.background = '#ffc94a';
   if (r === 'guest') { G = null; F = []; } else startMatch();
   if (matchMedia('(pointer:coarse)').matches) {
     const el = document.documentElement;
@@ -523,16 +668,16 @@ function wireConn(c) {
 function lostConn() {
   if (role !== 'host' && role !== 'guest') return;
   cleanupNet(); releaseAll();
-  role = null; G = null; F = [newFighter(0), newFighter(1)]; me = 0;
+  role = null; G = null; P = []; F = [newFighter(0), newFighter(1)]; me = 0;
   $('#hud').hidden = $('#pad').hidden = true;
   $('#banner').textContent = '';
   showScreen('lost');
 }
 
-const packF = f => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10, f.face, f.hp, ACTS.indexOf(f.act), f.t, f.blk ? 1 : 0];
+const packF = f => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10, f.face, f.hp, ACTS.indexOf(f.act), f.t, f.blk ? 1 : 0, Math.floor(f.en)];
 
 function sendSnap() {
-  send({ t: 's', f: F.map(packF), g: [G.phase, G.timer, G.round, G.wins, G.msg], e: outbox });
+  send({ t: 's', f: F.map(packF), g: [G.phase, G.timer, G.round, G.wins, G.msg], b: P.map(b => [Math.round(b.x), Math.round(b.y), b.dir, b.o]), e: outbox });
   outbox = [];
 }
 
@@ -545,10 +690,11 @@ function onData(d) {
     d.f.forEach((a, i) => {
       const f = F[i];
       if (f.tx === null) { f.x = a[0]; f.y = a[1]; }
-      Object.assign(f, { tx: a[0], ty: a[1], face: a[2], hp: a[3], act: ACTS[a[4]], t: a[5], blk: !!a[6] });
+      Object.assign(f, { tx: a[0], ty: a[1], face: a[2], hp: a[3], act: ACTS[a[4]], t: a[5], blk: !!a[6], en: a[7] });
     });
     const [phase, timer, round, wins, msg] = d.g;
     G = { phase, timer, round, wins, msg };
+    P = d.b.map(([x, y, dir, o]) => ({ x, y, dir, o }));
     d.e.forEach(onEvent);
   }
 }
@@ -560,6 +706,7 @@ $('#codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(
 $('#soloBtn').onclick = () => { cleanupNet(); enterGame('solo'); };
 $('#againBtn').onclick = () => { if (role === 'guest') send({ t: 'again' }); else if (role) startMatch(); };
 document.querySelectorAll('[data-menu]').forEach(b => { b.onclick = toMenu; });
+document.querySelectorAll('[data-screen]').forEach(b => { b.onclick = () => showScreen(b.dataset.screen); });
 
 // ---------- drawing ----------
 const cv = $('#c'), ctx = cv.getContext('2d');
@@ -624,12 +771,27 @@ function pose(f, now) {
     const e = Math.max(0, ext(f));
     ff = [lerp(22, 112, e), lerp(0, -92, e)]; bf = [-26, 0];
     fg = [22, -138]; bg = [4, -128]; lean = -12 * e;
+  } else if (f.act === 'finish') {
+    const e = Math.max(0, ext(f));
+    ff = [lerp(22, 100, e), lerp(0, -150, e)]; bf = [-22, 0];
+    fg = [10, -150]; bg = [-6, -124]; lean = -18 * e;
+  } else if (f.act === 'fire') {
+    const e = ext(f);
+    fg = e < 0 ? [10 + e * 30, -128] : [lerp(10, 82, e), -130];
+    bg = [fg[0] - 8, -116]; lean = 8 * Math.max(0, e);
+  } else if (f.act === 'dash') {
+    const e = Math.max(0, ext(f));
+    fg = [lerp(30, 46, e), lerp(-142, -205, e)]; bg = [8, -126]; lean = 12 * e;
+  } else if (f.act === 'dive') {
+    ff = [62, 18]; bf = [-18, -34]; fg = [10, -150]; bg = [-10, -140]; lean = 14;
+  } else if (f.act === 'rec') {
+    bob = 6; ff = [26, 0]; bf = [-26, 0];
   } else if (f.act === 'hit') {
     lean = -15; fg = [16, -152]; bg = [0, -120]; bob = 0;
   } else if (f.blk) {
     fg = [28, -160]; bg = [26, -134]; lean = -3;
   }
-  if (f.y > 0 && f.act !== 'kick') { ff = [18, -20]; bf = [-14, -12]; }
+  if (f.y > 0 && !['kick', 'finish', 'dive'].includes(f.act)) { ff = [18, -20]; bf = [-14, -12]; }
   return { lean, bob, ff, bf, fg, bg };
 }
 
@@ -671,6 +833,15 @@ function drawFighter(f, i, now) {
   ctx.lineWidth = 10; limb(sho, P.fg, 36, [0, 1]);
   ctx.fillStyle = col;
   ctx.beginPath(); ctx.arc(P.fg[0], P.fg[1], 12.5, 0, Math.PI * 2); ctx.fill();
+  if (f.act === 'fire' && f.t < MOVES.fire.start + 4) {
+    ctx.fillStyle = col; ctx.globalAlpha = 0.35 + 0.3 * Math.sin(now / 40);
+    ctx.beginPath(); ctx.arc(P.fg[0] + 10, P.fg[1] + 4, 10 + f.t * 1.4, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  if (f.act === 'dash' || f.act === 'dive' || f.act === 'finish') {
+    ctx.strokeStyle = col; ctx.globalAlpha = 0.45; ctx.lineWidth = 3;
+    for (const y of [-160, -120, -80]) { ctx.beginPath(); ctx.moveTo(-40, y); ctx.lineTo(-90, y); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
 
   if (f.blk) {
     ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 4;
@@ -702,6 +873,33 @@ function drawSparks(dt) {
   }
 }
 
+function drawBalls(dt) {
+  for (const b of P) {
+    if (role === 'guest') b.x += b.dir * 9 * dt / STEP; // between snapshots
+    const x = b.x, y = GROUND - b.y, col = COLORS[b.o];
+    ctx.fillStyle = col; ctx.globalAlpha = 0.25;
+    ctx.beginPath(); ctx.ellipse(x - b.dir * 22, y, 34, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x + b.dir * 4, y - 3, 8, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+// Called with the unmirrored arena transform; world x is flipped by hand on the guest's phone.
+function drawTexts(dt) {
+  texts = texts.filter(t => (t.life -= dt / 1100) > 0);
+  ctx.textAlign = 'center'; ctx.direction = 'rtl';
+  for (const t of texts) {
+    const x = me === 1 ? W - t.x : t.x, y = t.y - (1 - t.life) * 40;
+    ctx.globalAlpha = Math.min(1, t.life * 3);
+    ctx.font = `${t.size}px 'Secular One', 'Rubik', sans-serif`;
+    ctx.lineWidth = 6; ctx.strokeStyle = '#0009'; ctx.strokeText(t.txt, x, y);
+    ctx.fillStyle = t.col; ctx.fillText(t.txt, x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+
 function msgText(m) {
   if (!m) return '';
   switch (m.k) {
@@ -719,6 +917,9 @@ function updateHud() {
   const mine = F[me], opp = F[1 - me];
   $('#hpMe').style.width = mine.hp + '%';
   $('#hpOpp').style.width = opp.hp + '%';
+  $('#enMe').style.width = (mine.en || 0) + '%';
+  $('#enOpp').style.width = (opp.en || 0) + '%';
+  btnEls.s.classList.toggle('ready', (mine.en || 0) >= MOVES.dive.cost);
   $('#timer').textContent = Math.ceil(Math.max(0, G.timer) / 60);
   document.querySelectorAll('#pipsMe b').forEach((b, i) => b.classList.toggle('on', G.wins[me] > i));
   document.querySelectorAll('#pipsOpp b').forEach((b, i) => b.classList.toggle('on', G.wins[1 - me] > i));
@@ -762,15 +963,19 @@ function render(dt, now) {
   if (shake > 0.3) { sx = (Math.random() - 0.5) * shake; sy = (Math.random() - 0.5) * shake; shake *= 0.86; }
   ctx.translate(ox + sx * sc, oy + sy * sc);
   ctx.scale(sc, sc);
+  ctx.save();
   if (me === 1) { ctx.translate(W, 0); ctx.scale(-1, 1); }
 
   drawArena();
   if (F.length) {
     // the one that's attacking is drawn on top
-    const order = F[0].act === 'punch' || F[0].act === 'kick' ? [1, 0] : [0, 1];
+    const order = ATTACKS.includes(F[0].act) || F[0].act === 'dive' ? [1, 0] : [0, 1];
     order.forEach(i => drawFighter(F[i], i, now));
   }
+  drawBalls(dt);
   drawSparks(dt);
+  ctx.restore();
+  drawTexts(dt);
   updateHud();
 }
 
