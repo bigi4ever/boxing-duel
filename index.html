@@ -59,6 +59,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .code{font:400 54px/1.1 var(--display);letter-spacing:10px;direction:ltr;color:var(--gold);margin:4px 0}
 .codein{font:400 38px var(--display);letter-spacing:10px;text-align:center;width:100%;direction:ltr;padding:6px;border-radius:12px;border:1px solid var(--line);background:#120e1c;color:var(--ink);-webkit-user-select:text;user-select:text}
 .err{color:var(--red);min-height:1.3em;margin:4px 0 0;font-size:15px}
+.keys.install{color:var(--gold);font-size:14px}
 .keys{color:var(--muted);font-size:13px;margin:10px 0 0}
 
 #hud{position:fixed;top:0;left:0;right:0;display:flex;align-items:flex-start;gap:14px;direction:ltr;z-index:5;pointer-events:none;
@@ -144,6 +145,8 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
       <button class="btn" id="soloBtn">אימון נגד המחשב</button>
       <button class="btn" data-screen="movesScr">מכות מיוחדות</button>
     </div>
+    <button class="btn" id="installBtn" hidden>📲 התקנה כאפליקציה</button>
+    <p class="keys install" id="installNote" hidden></p>
     <p class="keys">במחשב: A/D תזוזה · W קפיצה · S הגנה · J אגרוף · K בעיטה · L מיוחד</p>
   </div>
 </section>
@@ -1166,6 +1169,29 @@ function loop(now) {
   render(dt, now);
 }
 requestAnimationFrame(loop);
+
+// Install from inside the game, without the Chrome menu. Chrome offers it (beforeinstallprompt) only when it
+// considers the app not installed; getInstalledRelatedApps says whether it thinks it is.
+let installEvt = null;
+const inApp = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+const note = t => { $('#installNote').textContent = t; $('#installNote').hidden = !t; };
+addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installEvt = e;
+  $('#installBtn').hidden = false; note('');
+});
+$('#installBtn').onclick = async () => {
+  if (!installEvt) return;
+  installEvt.prompt();
+  await installEvt.userChoice.catch(() => {});
+  installEvt = null; $('#installBtn').hidden = true;
+};
+addEventListener('appinstalled', () => { $('#installBtn').hidden = true; note('הותקן! אפשר לפתוח את דו־קרב ממסך הבית.'); });
+if (!inApp && navigator.getInstalledRelatedApps) {
+  navigator.getInstalledRelatedApps().then(apps => {
+    if (apps.length && !installEvt) note('Chrome מדווח שהמשחק כבר מותקן בטלפון הזה. חפשו "דו־קרב" במגירת האפליקציות.');
+  }).catch(() => {});
+}
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
