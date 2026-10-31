@@ -17,9 +17,9 @@ const PH = (() => {
   const JOINTS = {
     neck: ['torso', 'head', 1.47, -0.5, 0.5, 60],
     sh0:  ['torso', 'uarm0', 1.43, -1.2, 3.0, 120],
-    el0:  ['uarm0', 'farm0', 1.13, 0, 2.6, 80],
+    el0:  ['uarm0', 'farm0', 1.07, 0, 2.6, 90],
     sh1:  ['torso', 'uarm1', 1.43, -1.2, 3.0, 120],
-    el1:  ['uarm1', 'farm1', 1.13, 0, 2.6, 80],
+    el1:  ['uarm1', 'farm1', 1.07, 0, 2.6, 90],
     hip0: ['torso', 'thigh0', 0.95, -0.9, 1.9, 320],
     kn0:  ['thigh0', 'shin0', 0.52, -2.5, 0, 260],
     hip1: ['torso', 'thigh1', 0.95, -0.9, 1.9, 320],
@@ -63,15 +63,18 @@ const PH = (() => {
       b.setUserData({ f: i, part: name });
       B[name] = b; return b;
     };
+    // Legs (category 4) don't meet the other fighter's legs, so feet don't tangle when close; kicks still
+    // land on body, head and arms (category 1), and everything stands on the ground (category 1).
+    const leg = /^(thigh|shin)/.test.bind(/^(thigh|shin)/);
     const fx = (part, extra = {}) => Object.assign({ density: 6, friction: 0.4, filterGroupIndex: group,
-      filterCategoryBits: 1, filterMaskBits: 1, userData: { f: i, part } }, extra);
+      filterCategoryBits: leg(part) ? 4 : 1, filterMaskBits: leg(part) ? 1 : 5, userData: { f: i, part } }, extra);
     box(mk('torso', x, 1.2), 0.13, 0.27, 0, 0, fx('torso', { density: 8 }));
     mk('head', x, 1.64).createFixture(pl.Circle(0.16), fx('head', { density: 4 }));
     for (const a of ['0', '1']) {
-      box(mk('uarm' + a, x, 1.28), 0.045, 0.15, 0, 0, fx('uarm' + a));
-      const f = mk('farm' + a, x, 0.99);
-      box(f, 0.04, 0.14, 0, 0, fx('farm' + a));
-      f.createFixture(pl.Circle(V(0, -0.15), 0.07), fx('farm' + a, { density: 3 }));
+      box(mk('uarm' + a, x, 1.25), 0.045, 0.18, 0, 0, fx('uarm' + a));
+      const f = mk('farm' + a, x, 0.90);
+      box(f, 0.04, 0.17, 0, 0, fx('farm' + a));
+      f.createFixture(pl.Circle(V(0, -0.18), 0.07), fx('farm' + a, { density: 3 }));
       box(mk('thigh' + a, x, 0.735), 0.065, 0.215, 0, 0, fx('thigh' + a));
       const s = mk('shin' + a, x, 0.295);
       box(s, 0.05, 0.225, 0, 0, fx('shin' + a));
@@ -127,7 +130,7 @@ const PH = (() => {
     // walking: steer the torso's horizontal speed
     if (r.moveDir && lowest < 0.4) {
       const v = t.getLinearVelocity();
-      t.setLinearVelocity(V(v.x + (r.moveDir * 2.4 - v.x) * 0.2, v.y));
+      t.setLinearVelocity(V(v.x + (r.moveDir * 2.8 - v.x) * 0.3, v.y));
     }
   }
 
@@ -244,7 +247,7 @@ const PH = (() => {
 
   // Personal space: a horizontal push keeps the two bodies about half a meter apart (limbs still reach to hit),
   // so they can't walk through or climb over each other, without tipping anyone over.
-  const SPACE = 0.55;
+  const SPACE = 0.75;
   function personalSpace(W) {
     const [a, b] = W.rag;
     const dx = b.B.torso.getPosition().x - a.B.torso.getPosition().x;
@@ -287,7 +290,7 @@ const PH = (() => {
     const at = dy => [x - dy * Math.sin(a) * SCALE, y + dy * Math.cos(a) * SCALE];
     return { sh: at(0.23), hip: at(-0.25), a };
   }
-  const LIMBS = { arm0: ['sh', 'sh0', 'el0', 30, 32, 1], arm1: ['sh', 'sh1', 'el1', 30, 32, 1],
+  const LIMBS = { arm0: ['sh', 'sh0', 'el0', 36, 35, 1], arm1: ['sh', 'sh1', 'el1', 36, 35, 1],
     leg0: ['hip', 'hip0', 'kn0', 43, 50, -1], leg1: ['hip', 'hip1', 'kn1', 43, 50, -1] };
 
   // Two-bone IK: joint angles (fighter's frame) that put a hand or foot at point T (pixels, y up).
@@ -334,6 +337,6 @@ const PH = (() => {
 
   return { SCALE, PARTS, JN, POSES, newMatchWorld, step, controlRealtime, setPlan, pack, centerX, anchors, freeze,
     solveLimb, limbEnd, limbMid, jointsFrom, LIMBS, currentAngles,
-    LEN: { uarm: 30, farm: 30, thigh: 43, shin: 47 } };
+    LEN: { uarm: 36, farm: 35, thigh: 43, shin: 47 } };
 })();
 if (typeof module !== 'undefined') module.exports = PH;

@@ -57,10 +57,11 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 #turnInfo{font:500 12px var(--body);color:var(--gold);white-space:nowrap;margin-top:2px;text-shadow:0 1px 2px #000}
 #tpad{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:flex-end;direction:ltr;z-index:5;pointer-events:none;
   padding:0 calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
-.k.tbtn{width:58px;height:58px;font-size:11px}
-.k.tbtn span{font-size:20px}
+.k.tbtn{width:46px;height:46px;font-size:10px;gap:0}
+.k.tbtn span{font-size:16px}
 .k.tbtn.on{background:#ffc94a55;border-color:var(--gold)}
-.btn.tready{width:auto;margin:0;padding:14px 22px;font-size:18px;pointer-events:auto}
+.btn.tready{width:auto;margin:0;padding:10px 16px;font-size:16px;pointer-events:auto}
+#tpad .cluster{gap:6px}
 body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode="turns"] .bar.en{display:none}
 .btn.small{font-size:15px;padding:8px 10px;margin:4px 0}
 /* Sound switches and install sit beside the menu card, not in it, so the card fits a phone held sideways. */
@@ -253,7 +254,7 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
       <div class="modes" id="modes">
         <button class="mode" data-mode="classic">🥊 קלאסי</button>
         <button class="mode" data-mode="phys">🤸 פיזיקה</button>
-        <button class="mode" data-mode="turns">♟️ תורות</button>
+        <button class="mode" data-mode="turns">♟️ תכנון</button>
       </div>
     </div>
     <div class="chars" id="chars"></div>
@@ -1373,7 +1374,7 @@ function msgText(m) {
     case 'round': return 'סיבוב ' + m.n;
     case 'fight': return 'קרב!';
     case 'ko': return 'נוקאאוט!';
-    case 'time': return mode === 'turns' ? 'נגמרו התורות' : 'נגמר הזמן';
+    case 'time': return 'נגמר הזמן';
   }
   return '';
 }
@@ -1427,6 +1428,14 @@ function updateHud() {
   }
 }
 
+// Where the arena sits on screen. In the planning mode it's drawn smaller and higher, leaving room under the
+// fighters' feet for the buttons, so every handle on the body can be reached.
+function view() {
+  const below = mode === 'turns' && role && !selecting ? 90 : 0;
+  const sc = Math.min(cw / W, ch / (H + below));
+  return { sc, ox: (cw - W * sc) / 2, oy: (ch - (H + below) * sc) / 2 };
+}
+
 function render(dt, now) {
   // guest: glide toward the latest snapshot
   for (const f of F) {
@@ -1450,8 +1459,7 @@ function render(dt, now) {
   grd.addColorStop(0, '#0f0b19'); grd.addColorStop(1, '#221a36');
   ctx.fillStyle = grd; ctx.fillRect(0, 0, cw, ch);
 
-  const sc = Math.min(cw / W, ch / H);
-  const ox = (cw - W * sc) / 2, oy = (ch - H * sc) / 2;
+  const { sc, ox, oy } = view();
   let sx = 0, sy = 0;
   if (shake > 0.3) { sx = (Math.random() - 0.5) * shake; sy = (Math.random() - 0.5) * shake; shake *= 0.86; }
   ctx.translate(ox + sx * sc, oy + sy * sc);

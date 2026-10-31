@@ -1,10 +1,11 @@
 'use strict';
 // The two physics modes, on top of the classic game's rooms, rounds, HUD and sounds (index.html):
 //  'phys'  – real time: the same buttons, but fighters are ragdolls (physics.js) that sway, fall and get back up.
-//  'turns' – planned turns: the fight freezes, each player drags their fighter's hands, feet and head to plan
-//            a move, and when both are ready the physics plays it out for under a second. Then the next turn.
+//  'turns' – planned moves: the fight freezes, each player drags their fighter's hands, feet and head to plan
+//            a move, and when both are ready (or the 20 s timer runs out) the physics plays it out for under a
+//            second. Then the next move, until a knockout.
 // The host (or practice) runs the world; the guest draws snapshots and sends its inputs or its plan.
-const TURN = { PLAN: 20 * 60, SIM: 48, MAX: 12 };
+const TURN = { PLAN: 20 * 60, SIM: 48 };
 let PW = null;            // host/solo: the physics world
 let RV = null;            // drawn ragdolls: [fighter][part] = [x, y (up, pixels), angle]
 let RT = null;            // guest: latest snapshot to glide toward
@@ -39,8 +40,7 @@ function physTick(fight) {
   } else {
     stepWorld();
     if (--G.tt <= 0) {
-      if (++G.turn > TURN.MAX) G.timer = 0; // out of turns: the round goes to whoever has more health
-      else { G.tp = 'plan'; G.tt = TURN.PLAN; G.ready = [0, 0]; plans = [null, null]; }
+      G.turn++; G.tp = 'plan'; G.tt = TURN.PLAN; G.ready = [0, 0]; plans = [null, null];
     }
   }
   PW.rag.forEach((r, i) => {
@@ -86,7 +86,7 @@ function initPlan() {
   myPlan = {
     turn: G.turn, sent: false, move: 0, jump: false,
     h: [R[1][0], R[1][1]], h0: [R[1][0], R[1][1]],
-    a0: end(R[3], -15), a1: end(R[5], -15), l0: end(R[7], -24, face * 5), l1: end(R[9], -24, face * 5),
+    a0: end(R[3], -18), a1: end(R[5], -18), l0: end(R[7], -24, face * 5), l1: end(R[9], -24, face * 5),
   };
 }
 
@@ -111,9 +111,9 @@ function planEditable() { return mode === 'turns' && G && G.phase === 'fight' &&
 
 // Screen ↔ world: the arena is scaled to fit and mirrored on the guest's phone.
 function toWorld(e) {
-  const r = cv.getBoundingClientRect(), sc = Math.min(cw / W, ch / H);
-  let x = (e.clientX - r.left - (cw - W * sc) / 2) / sc;
-  const y = (e.clientY - r.top - (ch - H * sc) / 2) / sc;
+  const r = cv.getBoundingClientRect(), { sc, ox, oy } = view();
+  let x = (e.clientX - r.left - ox) / sc;
+  const y = (e.clientY - r.top - oy) / sc;
   if (me === 1) x = W - x;
   return [x, GROUND - y];
 }
@@ -193,7 +193,7 @@ function drawRagdoll(i) {
   // back leg and arm
   seg(th1, 21, 13, back); seg(sh1, 22, 11, back);
   foot(sh1, face, shade(col, 0.7));
-  seg(ua1, 15, 10, back); seg(fa1, 14, 9, back);
+  seg(ua1, 18, 10, back); seg(fa1, 17, 9, back);
   glove(fa1, shade(col, 0.75));
   // torso and shorts
   seg(torso, 25, 26, skin);
@@ -210,12 +210,12 @@ function drawRagdoll(i) {
   // front leg and arm
   seg(th0, 21, 13, skin); seg(sh0, 22, 11, skin);
   foot(sh0, face, col);
-  seg(ua0, 15, 10, skin); seg(fa0, 14, 9, skin);
+  seg(ua0, 18, 10, skin); seg(fa0, 17, 9, skin);
   glove(fa0, col);
 }
 
 function glove(p, col) {
-  const g = at(p, -15);
+  const g = at(p, -18);
   ctx.fillStyle = col;
   ctx.beginPath(); ctx.arc(g[0], g[1], 12, 0, Math.PI * 2); ctx.fill();
 }
@@ -270,18 +270,17 @@ function renderPhys(now) {
   }
 }
 
-// HUD bits for the physics modes: turn counter, who's ready, and the plan timer in the clock.
+// HUD bits for the planning mode: who's ready, and the plan timer in the clock.
 function physHud() {
   const info = $('#turnInfo');
-  const turns = mode === 'turns' && G && G.turn;
-  info.hidden = !turns;
   updateTurnPad();
-  if (!turns) return;
-  const oppReady = G.ready && G.ready[1 - me];
-  info.textContent = G.tp === 'plan'
-    ? `תור ${G.turn}/${TURN.MAX}${oppReady ? ' · היריב מוכן ✓' : ''}`
-    : `תור ${G.turn}/${TURN.MAX} · ⚔`;
-  // first turn of a match: how to plan
-  if (G.tp === 'plan' && G.turn === 1 && G.round === 1 && myPlan && !myPlan.sent) info.textContent += ' · גררו את העיגולים ואז ✔ מוכן';
-  $('#timer').textContent = G.phase === 'fight' && G.tp === 'plan' ? Math.ceil(G.tt / 60) : '⚔';
+  const on = mode === 'turns' && G && G.turn && G.phase === 'fight';
+  const parts = [];
+  if (on && G.tp === 'plan') {
+    if (G.ready && G.ready[1 - me]) parts.push('היריב מוכן ✓');
+    if (myPlan && !myPlan.sent && G.turn === 1 && G.round === 1) parts.push('גררו את העיגולים ואז ✔ מוכן');
+  }
+  const text = parts.join(' · ');
+  info.textContent = text; info.hidden = !text;
+  if (mode === 'turns' && G) $('#timer').textContent = G.phase === 'fight' && G.tp === 'plan' ? Math.ceil(G.tt / 60) : '⚔';
 }
