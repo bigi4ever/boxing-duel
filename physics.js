@@ -10,7 +10,8 @@ const PH = (() => {
   const pl = typeof planck !== 'undefined' ? planck : typeof require === 'function' ? require('planck') : null;
   if (!pl) return null; // library didn't load (offline): only the classic mode is offered
   const V = (x, y) => pl.Vec2(x, y);
-  const SCALE = 100;           // world pixels per meter
+  const SCALE = 120;           // world pixels per meter (the arena is 1000 px wide: 8.3 m)
+  const RING = 1000 / SCALE;
   const GRAV = -16;
   const PARTS = ['torso', 'head', 'uarm0', 'farm0', 'uarm1', 'farm1', 'thigh0', 'shin0', 'thigh1', 'shin1'];
   // joint: [parent, child, anchor y, lower, upper, max torque]
@@ -47,8 +48,8 @@ const PH = (() => {
     const world = new pl.World({ gravity: V(0, GRAV) });
     const ground = world.createBody();
     ground.createFixture(pl.Edge(V(-5, 0), V(15, 0)), { friction: 1 });
-    ground.createFixture(pl.Edge(V(0.3, 0), V(0.3, 6)), { friction: 0.2 });
-    ground.createFixture(pl.Edge(V(9.7, 0), V(9.7, 6)), { friction: 0.2 });
+    ground.createFixture(pl.Edge(V(0.25, 0), V(0.25, 6)), { friction: 0.2 });
+    ground.createFixture(pl.Edge(V(RING - 0.25, 0), V(RING - 0.25, 6)), { friction: 0.2 });
     const W = { world, rag: [], hits: [], press: [], tick: 0, touch: false };
     world.on('begin-contact', c => onContact(W, c));
     world.on('post-solve', (c, imp) => { if (W.touch) onPress(W, c, imp); });
@@ -100,8 +101,9 @@ const PH = (() => {
   function newMatchWorld(opts = {}) {
     const W = makeWorld();
     W.touch = !!opts.touch;
-    buildRagdoll(W, 0, 3.6, 1);
-    buildRagdoll(W, 1, 6.4, -1);
+    buildRagdoll(W, 0, RING / 2 - 1.4, 1);
+    buildRagdoll(W, 1, RING / 2 + 1.4, -1);
+    if (opts.hp) for (const r of W.rag) r.hp = opts.hp;
     return W;
   }
 
@@ -367,8 +369,8 @@ const PH = (() => {
     const at = dy => [x - dy * Math.sin(a) * SCALE, y + dy * Math.cos(a) * SCALE];
     return { sh: at(0.23), hip: at(-0.25), a };
   }
-  const LIMBS = { arm0: ['sh', 'sh0', 'el0', 36, 35, 1], arm1: ['sh', 'sh1', 'el1', 36, 35, 1],
-    leg0: ['hip', 'hip0', 'kn0', 43, 50, -1], leg1: ['hip', 'hip1', 'kn1', 43, 50, -1] };
+  const LIMBS = { arm0: ['sh', 'sh0', 'el0', 0.36 * SCALE, 0.35 * SCALE, 1], arm1: ['sh', 'sh1', 'el1', 0.36 * SCALE, 0.35 * SCALE, 1],
+    leg0: ['hip', 'hip0', 'kn0', 0.43 * SCALE, 0.5 * SCALE, -1], leg1: ['hip', 'hip1', 'kn1', 0.43 * SCALE, 0.5 * SCALE, -1] };
 
   // Two-bone IK: joint angles (fighter's frame) that put a hand or foot at point T (pixels, y up).
   // Elbows bend forward (+), knees backward (−). Out-of-reach points get the straight limb pointed at them.

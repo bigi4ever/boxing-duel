@@ -293,14 +293,15 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 // Networking: the phone that creates the room (host) runs the whole simulation; the guest only sends its buttons
 // and draws the snapshots it gets back. Both see their own fighter on the left (the guest's view is mirrored).
 const W = 1000, H = 562, GROUND = 478, STEP = 1000 / 60, MAX_HP = 200;
+const FIG = 1.2; // fighters are drawn (and reach) 20% bigger than the original sizes below the drawing code uses
 // h: height of the hit spark; launch: knocks the target up into the air.
 const MOVES = {
-  punch:  { start: 4,  active: 4,  rec: 9,  reach: 92,  dmg: 7,  kb: 3,  stun: 16, h: -140 },
-  kick:   { start: 9,  active: 5,  rec: 15, reach: 124, dmg: 12, kb: 8,  stun: 18, h: -88 },
-  finish: { start: 7,  active: 5,  rec: 18, reach: 128, dmg: 16, kb: 9,  stun: 30, h: -110, launch: 10 },
+  punch:  { start: 4,  active: 4,  rec: 9,  reach: 110, dmg: 7,  kb: 3,  stun: 16, h: -168 },
+  kick:   { start: 9,  active: 5,  rec: 15, reach: 149, dmg: 12, kb: 8,  stun: 18, h: -106 },
+  finish: { start: 7,  active: 5,  rec: 18, reach: 154, dmg: 16, kb: 9,  stun: 30, h: -132, launch: 10 },
   fire:   { start: 10, active: 1,  rec: 18, cost: 35 },
-  dash:   { start: 6,  active: 14, rec: 18, reach: 74,  dmg: 15, kb: 4,  stun: 30, h: -170, launch: 12, cost: 35 },
-  dive:   {                                 reach: 76,  dmg: 10, kb: 6,  stun: 18, h: -30, cost: 25 },
+  dash:   { start: 6,  active: 14, rec: 18, reach: 89,  dmg: 15, kb: 4,  stun: 30, h: -204, launch: 12, cost: 35 },
+  dive:   {                                 reach: 91,  dmg: 10, kb: 6,  stun: 18, h: -36, cost: 25 },
   ball:   {                                               dmg: 12, kb: 7,  stun: 20, chip: 3 },
 };
 const SPECIAL_NAMES = { fire: 'כדור אש!', dash: 'אפרקאט רקטה!', dive: 'בעיטת צלילה!' };
@@ -330,16 +331,19 @@ const lerp = (a, b, t) => a + (b - a) * t;
 let role = null;          // null (menu) | 'solo' | 'host' | 'guest'
 let me = 0;               // which fighter is mine: host/solo 0, guest 1
 let peer = null, conn = null;
+let mode = 'classic';     // 'classic' | 'phys' (ragdolls, real time) | 'turns' (ragdolls, planned turns) — physmode.js
 let F = [newFighter(0), newFighter(1)];
 let G = null;
 let P = [];               // fireballs in flight: { x, y (height above the mat), dir, o (owner) }
 let inp = [{ held: 0, latch: 0, age: 0 }, { held: 0, latch: 0, age: 0 }];
 let outbox = [], sparks = [], texts = [], shake = 0, tick = 0;
 let score = [0, 0];       // matches won by each fighter since the room was opened (online only)
-let mode = 'classic';     // 'classic' | 'phys' (ragdolls, real time) | 'turns' (ragdolls, planned turns) — physmode.js
+
+// Health per fighter: the planning mode's fights are shorter.
+function maxHp() { return mode === 'turns' ? 100 : MAX_HP; }
 
 function newFighter(i, en = 0) {
-  return { x: i ? 680 : 320, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, hp: MAX_HP, en, act: 'idle', t: 0,
+  return { x: i ? 680 : 320, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, hp: maxHp(), en, act: 'idle', t: 0,
     hit: false, landed: false, chain: [], combo: 0, blk: false, walk: 0 };
 }
 
@@ -423,7 +427,7 @@ function special(f, held) {
   f.en -= MOVES[kind].cost;
   startAttack(f, kind);
   if (kind === 'dive') { f.vy = -8; f.vx = f.face * 10; }
-  emit({ k: 'sp', w: i, s: kind, x: f.x, y: GROUND - f.y - 200 });
+  emit({ k: 'sp', w: i, s: kind, x: f.x, y: GROUND - f.y - 240 });
   return true;
 }
 
@@ -456,7 +460,7 @@ function updateFighter(f, o, held, latch) {
     if (latch & (BIT.p | BIT.k | BIT.s) && tryCancel(f, held, latch)) return true;
     const m = MOVES[f.act];
     f.t++;
-    if (f.act === 'fire' && f.t === m.start) P.push({ x: f.x + f.face * 55, y: f.y + 105, dir: f.face, o: F.indexOf(f) });
+    if (f.act === 'fire' && f.t === m.start) P.push({ x: f.x + f.face * 66, y: f.y + 126, dir: f.face, o: F.indexOf(f) });
     if (f.t >= m.start + m.active + m.rec) f.act = 'idle';
     if (onGround) f.vx *= 0.7;
     if (f.act === 'dash' && f.t >= m.start && f.t < m.start + m.active) { f.vx = f.face * 9; if (f.t === m.start) f.vy = 4; }
@@ -478,7 +482,7 @@ function updateFighter(f, o, held, latch) {
 }
 
 function separate() {
-  const a = F[0], b = F[1], min = 58;
+  const a = F[0], b = F[1], min = 70;
   for (const f of F) f.x = clamp(f.x, 50, W - 50);
   if (Math.abs(a.y - b.y) > 110) return;
   const d = b.x - a.x;
@@ -506,7 +510,7 @@ function checkHit(i) {
   f.hit = true;
   const x = f.x + f.face * Math.max(30, dx - 22), y = GROUND - f.y + m.h;
   f.landed = applyHit(i, m, x, y, f.face);
-  if (f.landed && f.act === 'finish') emit({ k: 'fin', w: i, x: o.x, y: GROUND - o.y - 230 });
+  if (f.landed && f.act === 'finish') emit({ k: 'fin', w: i, x: o.x, y: GROUND - o.y - 276 });
 }
 
 // Damage, knockback, energy and the combo count, for every kind of hit. Returns true if it wasn't blocked.
@@ -540,7 +544,7 @@ function moveBalls() {
   P = P.filter(b => {
     if (b.x < -40 || b.x > W + 40) return false;
     const o = F[1 - b.o];
-    if (o.act === 'ko' || Math.abs(o.x - b.x) > 36 || b.y < o.y + 10 || b.y > o.y + 170) return true;
+    if (o.act === 'ko' || Math.abs(o.x - b.x) > 43 || b.y < o.y + 12 || b.y > o.y + 204) return true;
     applyHit(b.o, MOVES.ball, b.x, GROUND - b.y, b.dir);
     return false;
   });
@@ -574,12 +578,12 @@ function botBits(b, p) {
   if ((p.act === 'punch' || p.act === 'kick' || p.act === 'dash') && p.t < 4 && d < 140 && Math.random() < 0.12) { bot.blk = 18; return BIT.b; }
   if (P.some(f => f.o === 0 && f.dir * (b.x - f.x) > 0 && Math.abs(b.x - f.x) < 160) && Math.random() < 0.08) return BIT.j;
   let h = 0;
-  if (d > 105) h |= toward; else if (d < 66 && Math.random() < 0.5) h |= away;
+  if (d > 126) h |= toward; else if (d < 79 && Math.random() < 0.5) h |= away;
   if (--bot.cd <= 0) {
     if (d > 260 && b.en >= 35 && Math.random() < 0.5) { h = BIT.s; bot.cd = 60; }
-    else if (d < 110 && b.en >= 60 && Math.random() < 0.25) { h = toward | BIT.s; bot.cd = 60; }
-    else if (d < 130) {
-      h |= d < 95 && Math.random() < 0.7 ? BIT.p : BIT.k;
+    else if (d < 132 && b.en >= 60 && Math.random() < 0.25) { h = toward | BIT.s; bot.cd = 60; }
+    else if (d < 156) {
+      h |= d < 114 && Math.random() < 0.7 ? BIT.p : BIT.k;
       bot.cd = Math.floor((28 + Math.random() * 45) * (mode === 'classic' ? 1 : 1.9)); // ragdoll hits land harder: attack less often
     } else bot.cd = 0;
   }
@@ -912,7 +916,8 @@ function renderSelect() {
       const saved = ctx, saveChars = chars;
       ctx = b.firstChild.getContext('2d');
       chars = [k, k];
-      ctx.setTransform(1.15, 0, 0, 1.15, 90 - 320 * 1.15, 232 - GROUND * 1.15);
+      const zoom = 1.15 / FIG;
+      ctx.setTransform(zoom, 0, 0, zoom, 90 - 320 * zoom, 232 - GROUND * zoom);
       drawFighter(newFighter(0), 0, 0);
       ctx = saved; chars = saveChars;
     });
@@ -1274,11 +1279,11 @@ function drawFighter(f, i, now) {
   const col = colorOf(i), ch = charOf(i), skin = ch.skin;
   // shadow
   ctx.fillStyle = '#0006';
-  ctx.beginPath(); ctx.ellipse(f.x, GROUND + 4, 38 * (1 - Math.min(f.y / 300, 0.5)), 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(f.x, GROUND + 4, 38 * FIG * (1 - Math.min(f.y / 300, 0.5)), 8, 0, 0, Math.PI * 2); ctx.fill();
 
   ctx.save();
   ctx.translate(f.x, GROUND - f.y);
-  ctx.scale(f.face, 1);
+  ctx.scale(f.face * FIG, FIG);
   if (f.act === 'ko') ctx.rotate(-Math.PI / 2 * Math.min(1, f.t / 14));
   const P = pose(f, now);
   const hip = [0, -72 + P.bob * 0.3], sho = [P.lean * 0.8, -132 + P.bob], head = [P.lean + 3, -158 + P.bob];
@@ -1322,7 +1327,7 @@ function drawFighter(f, i, now) {
 
   if (i === me && role && G && G.phase === 'intro') {
     ctx.fillStyle = '#ffc94a';
-    const y = GROUND - f.y - 200 + Math.sin(now / 150) * 4;
+    const y = GROUND - f.y - 200 * FIG + Math.sin(now / 150) * 4;
     ctx.beginPath(); ctx.moveTo(f.x - 10, y); ctx.lineTo(f.x + 10, y); ctx.lineTo(f.x, y + 14); ctx.fill();
   }
 }
@@ -1395,8 +1400,8 @@ let bannerKey = '';
 function updateHud() {
   if (!role || !G || !F.length) return;
   const mine = F[me], opp = F[1 - me];
-  $('#hpMe').style.width = mine.hp / MAX_HP * 100 + '%';
-  $('#hpOpp').style.width = opp.hp / MAX_HP * 100 + '%';
+  $('#hpMe').style.width = mine.hp / maxHp() * 100 + '%';
+  $('#hpOpp').style.width = opp.hp / maxHp() * 100 + '%';
   $('#enMe').style.width = (mine.en || 0) + '%';
   $('#enOpp').style.width = (opp.en || 0) + '%';
   btnEls.s.classList.toggle('ready', (mine.en || 0) >= MOVES.dive.cost);

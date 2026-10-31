@@ -15,7 +15,7 @@ let drag = null;
 
 // ---------- host / practice ----------
 function physStart() {
-  PW = PH.newMatchWorld({ touch: mode === 'turns' });
+  PW = PH.newMatchWorld({ touch: mode === 'turns', hp: maxHp() });
   RV = PH.pack(PW);
   plans = [null, null];
   Object.assign(G, { tp: mode === 'turns' ? 'plan' : null, tt: TURN.PLAN, turn: 1, ready: [0, 0] });
@@ -68,7 +68,7 @@ function botPlan() {
     ...PH.solveLimb(torso, face, 'arm1', [torso[0] - 20, torso[1] + 40 + jit()]),
   };
   if (Math.random() < 0.4) Object.assign(t, PH.solveLimb(torso, face, 'leg0', [foe[0][0] + jit(), foe[0][1] + jit()]));
-  return { t, lean: Math.random() * 0.35, move: dist > 175 ? 1 : 0, jump: Math.random() < 0.08 };
+  return { t, lean: Math.random() * 0.35, move: dist > 1.75 * PH.SCALE ? 1 : 0, jump: Math.random() < 0.08 };
 }
 
 // ---------- guest ----------
@@ -86,14 +86,14 @@ function initPlan() {
   myPlan = {
     turn: G.turn, sent: false, move: 0, jump: false,
     h: [R[1][0], R[1][1]], h0: [R[1][0], R[1][1]],
-    a0: end(R[3], -18), a1: end(R[5], -18), l0: end(R[7], -24, face * 5), l1: end(R[9], -24, face * 5),
+    a0: end(R[3], -18 * K()), a1: end(R[5], -18 * K()), l0: end(R[7], -24 * K(), face * 5 * K()), l1: end(R[9], -24 * K(), face * 5 * K()),
   };
 }
 
 function planPayload() {
   const torso = RV[me][0], face = me ? -1 : 1, t = {};
   for (const [k, limb] of [['a0', 'arm0'], ['a1', 'arm1'], ['l0', 'leg0'], ['l1', 'leg1']]) Object.assign(t, PH.solveLimb(torso, face, limb, myPlan[k]));
-  const lean = clamp((myPlan.h[0] - myPlan.h0[0]) * face / 70, -0.6, 0.6);
+  const lean = clamp((myPlan.h[0] - myPlan.h0[0]) * face / (70 * K()), -0.6, 0.6);
   return { t, lean, move: myPlan.move, jump: myPlan.jump };
 }
 
@@ -136,7 +136,7 @@ cv.addEventListener('pointermove', e => {
   let [x, y] = toWorld(e);
   y = Math.max(0, y);
   if (drag.k === 'h') {
-    myPlan.h = [clamp(x, myPlan.h0[0] - 50, myPlan.h0[0] + 50), myPlan.h0[1]];
+    myPlan.h = [clamp(x, myPlan.h0[0] - 50 * K(), myPlan.h0[0] + 50 * K()), myPlan.h0[1]];
   } else {
     // keep the handle where the limb can actually reach
     const limb = { a0: 'arm0', a1: 'arm1', l0: 'leg0', l1: 'leg1' }[drag.k], face = me ? -1 : 1, torso = RV[me][0];
@@ -177,9 +177,12 @@ function smoothRagdolls() {
 // Part (pixels, y up) → screen point at local offset along the part (dy up the part, dx across).
 const at = (p, dy, dx = 0) => [p[0] - Math.sin(p[2]) * dy + Math.cos(p[2]) * dx, GROUND - (p[1] + Math.cos(p[2]) * dy + Math.sin(p[2]) * dx)];
 
+// Part sizes below are in centimeters; K() turns them into pixels at the world's scale.
+const K = () => PH.SCALE / 100;
+
 function seg(p, half, width, color) {
-  const a = at(p, half), b = at(p, -half);
-  ctx.strokeStyle = color; ctx.lineWidth = width;
+  const a = at(p, half * K()), b = at(p, -half * K());
+  ctx.strokeStyle = color; ctx.lineWidth = width * K();
   ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
 }
 
@@ -189,7 +192,7 @@ function drawRagdoll(i) {
   ctx.lineCap = ctx.lineJoin = 'round';
   // shadow
   ctx.fillStyle = '#0006';
-  ctx.beginPath(); ctx.ellipse(torso[0], GROUND + 4, 40, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(torso[0], GROUND + 4, 40 * K(), 8, 0, 0, Math.PI * 2); ctx.fill();
   // back leg and arm
   seg(th1, 21, 13, back); seg(sh1, 22, 11, back);
   foot(sh1, face, shade(col, 0.7));
@@ -197,14 +200,14 @@ function drawRagdoll(i) {
   glove(fa1, shade(col, 0.75));
   // torso and shorts
   seg(torso, 25, 26, skin);
-  const hipA = at(torso, -25), hipB = at(torso, -10);
-  ctx.strokeStyle = col; ctx.lineWidth = 32;
+  const hipA = at(torso, -25 * K()), hipB = at(torso, -10 * K());
+  ctx.strokeStyle = col; ctx.lineWidth = 32 * K();
   ctx.beginPath(); ctx.moveTo(hipA[0], hipA[1]); ctx.lineTo(hipB[0], hipB[1]); ctx.stroke();
   // head with the character's look
   ctx.save();
   ctx.translate(head[0], GROUND - head[1]);
   ctx.rotate(-head[2]);
-  ctx.scale(face, 1);
+  ctx.scale(face * K(), K());
   drawHead(ch, col, 0, 0);
   ctx.restore();
   // front leg and arm
@@ -215,14 +218,14 @@ function drawRagdoll(i) {
 }
 
 function glove(p, col) {
-  const g = at(p, -18);
+  const g = at(p, -18 * K());
   ctx.fillStyle = col;
-  ctx.beginPath(); ctx.arc(g[0], g[1], 12, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(g[0], g[1], 12 * K(), 0, Math.PI * 2); ctx.fill();
 }
 
 function foot(p, face, col) {
-  const a = at(p, -24, -face * 4), b = at(p, -24, face * 14);
-  ctx.strokeStyle = col; ctx.lineWidth = 9;
+  const a = at(p, -24 * K(), -face * 4 * K()), b = at(p, -24 * K(), face * 14 * K());
+  ctx.strokeStyle = col; ctx.lineWidth = 9 * K();
   ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
 }
 
