@@ -91,6 +91,7 @@ const PH = (() => {
       }, B[pa], B[ch], V(x, ay)));
     }
     const r = { i, face, B, J, target: { ...POSES.guard }, lean: 0, speed: 14, stun: 0, ko: false, hp: 200, armed: false,
+      st: { punch: 1, kick: 1, def: 1, speed: 1, jump: 1, quick: 1 }, // the character's ability (index.html CHARS)
       walk: 0, act: null, actT: 0, cool: {}, moveDir: 0, blocking: false };
     W.rag[i] = r;
     return r;
@@ -104,6 +105,7 @@ const PH = (() => {
     buildRagdoll(W, 0, RING / 2 - 1.4, 1);
     buildRagdoll(W, 1, RING / 2 + 1.4, -1);
     if (opts.hp) for (const r of W.rag) r.hp = opts.hp;
+    if (opts.stats) W.rag.forEach((r, i) => Object.assign(r.st, opts.stats[i]));
     return W;
   }
 
@@ -118,7 +120,8 @@ const PH = (() => {
       j.setMaxMotorTorque(JOINTS[n][5] * limp);
       const t = r.target[n] ?? 0;
       const err = t - angleOf(r, n);
-      j.setMotorSpeed(r.face * Math.max(-r.speed, Math.min(r.speed, err * 12)));
+      const sp = r.speed * (r.st.quick < 1 ? 1.25 : 1);
+      j.setMotorSpeed(r.face * Math.max(-sp, Math.min(sp, err * 12)));
     }
   }
 
@@ -137,11 +140,11 @@ const PH = (() => {
     // walking: steer the torso's horizontal speed
     if (r.moveDir && lowest < 0.4) {
       const v = t.getLinearVelocity();
-      t.setLinearVelocity(V(v.x + (r.moveDir * 2.8 - v.x) * 0.3, v.y));
+      t.setLinearVelocity(V(v.x + (r.moveDir * 2.8 * r.st.speed - v.x) * 0.3, v.y));
       // feet planted in a pose (planning mode) hold the body back by friction: push the legs along too
-      if (Math.abs(v.x) < 2.6) for (const p of ['thigh0', 'thigh1', 'shin0', 'shin1']) {
+      if (Math.abs(v.x) < 2.6 * r.st.speed) for (const p of ['thigh0', 'thigh1', 'shin0', 'shin1']) {
         const b = r.B[p];
-        b.applyForceToCenter(V(r.moveDir * b.getMass() * 34, 0), true);
+        b.applyForceToCenter(V(r.moveDir * b.getMass() * 34 * r.st.speed, 0), true);
       }
     }
   }
@@ -173,7 +176,8 @@ const PH = (() => {
       // planning mode: even a slow touch on body (1) or head (2) counts
       const touch = W.touch && vital ? (h.dpart === 'head' ? 2 : 1) : 0;
       if (over <= 0 && !touch) continue;
-      const dmg = Math.max(touch, Math.min(24, Math.round(Math.max(0, over) * 3.2 * (TAKES[h.dpart] || 0.3))));
+      const power = /^(farm|uarm)/.test(h.part) ? A.st.punch : /^(shin|thigh)/.test(h.part) ? A.st.kick : 1;
+      const dmg = Math.max(touch, Math.min(30, Math.round(Math.max(0, over) * 3.2 * (TAKES[h.dpart] || 0.3) * power * D.st.def)));
       if (dmg < 1) continue;
       A.cool[h.part] = W.tick + 14;
       D.hp = Math.max(0, D.hp - dmg);
@@ -224,7 +228,7 @@ const PH = (() => {
       const D = W.rag[p.def];
       if (D.ko) continue;
       const head = p.dpart === 'head';
-      D.pdmg += p.n * (head ? 1.2 : 0.6);
+      D.pdmg += p.n * (head ? 1.2 : 0.6) * D.st.def;
       if (head) D.neck += p.n;
       D.lastPress = p;
     }
@@ -257,7 +261,7 @@ const PH = (() => {
   }
 
   // ---- real-time controls: buttons → target pose ----
-  const ACT_LEN = { punch: 16, punch2: 16, kick: 26 };
+  const ACT_LEN = { punch: 20, punch2: 20, kick: 26 };
   function controlRealtime(r, held, taps, B) {
     if (r.ko) return;
     const t = { ...POSES.guard };
@@ -277,7 +281,7 @@ const PH = (() => {
       else if (r.jumpBuf > 0 && onGround && !(r.jumpCd > 0)) {
         r.jumpBuf = 0; r.jumpCd = 20; // feet are still low right after take-off
         // jumping while moving (joystick diagonal) takes off in that direction
-        for (const p of PARTS) { const b = r.B[p], v = b.getLinearVelocity(); b.setLinearVelocity(V(dir ? dir * r.face * 2.8 : v.x, 6.2)); }
+        for (const p of PARTS) { const b = r.B[p], v = b.getLinearVelocity(); b.setLinearVelocity(V(dir ? dir * r.face * 2.8 : v.x, 6.2 * r.st.jump)); }
       }
     }
     if (!onGround && dir) { // a little steering in the air
@@ -289,18 +293,24 @@ const PH = (() => {
     if (r.act && r.act !== 'kick') r.moveDir = dir * r.face * 0.7; // can step in while punching
     if (r.act) {
       r.actT++;
-      const len = ACT_LEN[r.act], strike = r.actT > 2 && r.actT < len * 0.65;
+      const len = ACT_LEN[r.act], punch = r.act !== 'kick';
+      // punches snap out early and stay straight longer (more reach); kicks as before
+      const strike = punch ? r.actT > 1 && r.actT < len * 0.75 : r.actT > 2 && r.actT < len * 0.65;
       if (strike) Object.assign(t, POSES[r.act]);
       if (r.act === 'kick') r.lean = -0.25;
-      else r.lean = strike ? 0.15 : 0;
-      r.speed = 18;
+      else r.lean = strike ? 0.3 : 0;
+      r.speed = punch ? 24 : 18;
+      if (punch && r.actT === 2 && onGround) { // a small step into the punch
+        const tb = r.B.torso, v = tb.getLinearVelocity();
+        tb.setLinearVelocity(V(v.x + r.face * 1.6, v.y));
+      }
       if (r.actT >= len) r.act = null;
     } else if (r.blocking) {
       Object.assign(t, POSES.block);
     } else {
       if (dir) {
         r.moveDir = dir * r.face;
-        r.walk += 0.22;
+        r.walk += 0.22 * r.st.speed;
         const s = Math.sin(r.walk);
         t.hip0 = 0.1 + s * 0.45; t.hip1 = 0.1 - s * 0.45;
         t.kn0 = -0.2 - Math.max(0, -s) * 0.9; t.kn1 = -0.2 - Math.max(0, s) * 0.9;
@@ -321,7 +331,7 @@ const PH = (() => {
     const onGround = Math.min(r.B.shin0.getPosition().y, r.B.shin1.getPosition().y) < 0.4;
     if (plan.jump && onGround) for (const p of PARTS) { // a jump with a step takes off in that direction
       const b = r.B[p], v = b.getLinearVelocity();
-      b.setLinearVelocity(V(plan.move ? plan.move * r.face * 2.8 : v.x, 6.2));
+      b.setLinearVelocity(V(plan.move ? plan.move * r.face * 2.8 : v.x, 6.2 * r.st.jump));
     }
   }
 

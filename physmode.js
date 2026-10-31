@@ -15,7 +15,7 @@ let drag = null;
 
 // ---------- host / practice ----------
 function physStart() {
-  PW = PH.newMatchWorld({ touch: mode === 'turns', hp: maxHp() });
+  PW = PH.newMatchWorld({ touch: mode === 'turns', hp: maxHp(), stats: [statsOf(0), statsOf(1)] });
   RV = PH.pack(PW);
   plans = [null, null];
   Object.assign(G, { tp: mode === 'turns' ? 'plan' : null, tt: TURN.PLAN, turn: 1, ready: [0, 0] });
@@ -43,6 +43,8 @@ function physTick(fight) {
       G.turn++; G.tp = 'plan'; G.tt = TURN.PLAN; G.ready = [0, 0]; plans = [null, null];
     }
   }
+  if (fight && G.phase === 'fight' && PW.tick % 120 === 0) // regen ability
+    PW.rag.forEach((r, i) => { if (stat(i, 'regen') && !r.ko && r.hp > 0) r.hp = Math.min(maxHp(), r.hp + stat(i, 'regen')); });
   PW.rag.forEach((r, i) => {
     Object.assign(F[i], { hp: r.hp, en: 0, x: PH.centerX(r), y: 0, act: r.ko ? 'ko' : r.act || 'idle' });
   });

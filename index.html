@@ -91,6 +91,7 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 @media (max-width:560px){.chars{grid-template-columns:repeat(3,1fr)}}
 .char{background:#120e1c;border:2px solid var(--line);border-radius:12px;padding:4px 2px 6px;color:var(--ink);font:500 14px var(--body);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
 .char canvas{width:100%;max-width:90px;aspect-ratio:3/4;display:block}
+.char small{font-size:10.5px;color:var(--muted);line-height:1.15;text-align:center;padding:0 2px}
 .char.mine{border-color:var(--c);box-shadow:0 0 0 2px var(--c),0 0 18px var(--c)}
 .char.theirs::after{content:'היריב';font-size:11px;color:var(--muted)}
 .btn.primary{background:var(--gold);color:#2a1d00;border-color:transparent;font-weight:700}
@@ -320,14 +321,26 @@ const TAPS = BIT.j | BIT.p | BIT.k | BIT.s;
 const ACTS = ['idle', 'punch', 'kick', 'hit', 'ko', 'finish', 'fire', 'dash', 'dive', 'rec'];
 const PREFIX = 'bigi4ever-boxing-duel-';
 // Fighters to pick from. col: gloves, shorts and fireballs; alt: used when both players pick the same one.
+// perk: one ability each, shown on the picker. stats multiply the defaults (1): punch / kick damage dealt,
+// def damage taken, speed walking, jump height, quick recovery after a strike (physics: faster limbs),
+// energy gained (classic specials), regen health per 2 s.
 const CHARS = [
-  { name: 'להבה',   col: '#ff4d5e', alt: '#ff9a2e', skin: '#f1d0b5', hair: '#4a2a1a', look: 'band' },
-  { name: 'קרח',    col: '#3fa8ff', alt: '#36e0c8', skin: '#e8e2f6', hair: '#dff3ff', look: 'spiky' },
-  { name: 'רעם',    col: '#ffc94a', alt: '#ff6b3d', skin: '#8a5a3c', hair: '#1b1b1b', look: 'mohawk' },
-  { name: 'יער',    col: '#4fd17a', alt: '#2ec4ff', skin: '#c58c5c', hair: '#2b1a10', look: 'cap' },
-  { name: 'צל',     col: '#a66bff', alt: '#ff4d8b', skin: '#8f86ad', hair: '#1a1526', look: 'mask' },
-  { name: 'סוכריה', col: '#ff7ad9', alt: '#8a7dff', skin: '#f6dcc6', hair: '#ffd84a', look: 'pony' },
+  { name: 'להבה',   col: '#ff4d5e', alt: '#ff9a2e', skin: '#f1d0b5', hair: '#4a2a1a', look: 'band',
+    perk: '👊 אגרופים חזקים', stats: { punch: 1.3 } },
+  { name: 'קרח',    col: '#3fa8ff', alt: '#36e0c8', skin: '#e8e2f6', hair: '#dff3ff', look: 'spiky',
+    perk: '🛡️ חוטף פחות נזק', stats: { def: 0.8 } },
+  { name: 'רעם',    col: '#ffc94a', alt: '#ff6b3d', skin: '#8a5a3c', hair: '#1b1b1b', look: 'mohawk',
+    perk: '🦵 בעיטות חזקות, איטי', stats: { kick: 1.35, speed: 0.85 } },
+  { name: 'יער',    col: '#4fd17a', alt: '#2ec4ff', skin: '#c58c5c', hair: '#2b1a10', look: 'cap',
+    perk: '💨 מהיר וקופץ גבוה', stats: { speed: 1.25, jump: 1.12 } },
+  { name: 'צל',     col: '#a66bff', alt: '#ff4d8b', skin: '#8f86ad', hair: '#1a1526', look: 'mask',
+    perk: '⚡ מכות מהירות', stats: { quick: 0.6 } },
+  { name: 'סוכריה', col: '#ff7ad9', alt: '#8a7dff', skin: '#f6dcc6', hair: '#ffd84a', look: 'pony',
+    perk: '💗 מתאוששת לאט', stats: { regen: 1, energy: 1.5 } },
 ];
+const STAT_BASE = { punch: 1, kick: 1, def: 1, speed: 1, jump: 1, quick: 1, energy: 1, regen: 0 };
+const statsOf = i => ({ ...STAT_BASE, ...CHARS[chars[i]].stats });
+const stat = (i, k) => statsOf(i)[k];
 let chars = [0, 1];       // which character each fighter (0, 1) plays
 const charOf = i => CHARS[chars[i]];
 const colorOf = i => i === 1 && chars[0] === chars[1] ? CHARS[chars[1]].alt : CHARS[chars[i]].col;
@@ -394,6 +407,7 @@ function step() {
     separate();
     checkHit(0); checkHit(1);
     moveBalls();
+    if (fight && tick % 120 === 0) F.forEach((f, i) => { if (stat(i, 'regen') && f.act !== 'ko' && f.hp > 0) f.hp = Math.min(maxHp(), f.hp + stat(i, 'regen')); });
   }
 
   if (G.phase === 'fight') {
@@ -470,7 +484,7 @@ function updateFighter(f, o, held, latch) {
     const m = MOVES[f.act];
     f.t++;
     if (f.act === 'fire' && f.t === m.start) P.push({ x: f.x + f.face * 66, y: f.y + 126, dir: f.face, o: F.indexOf(f) });
-    if (f.t >= m.start + m.active + m.rec) f.act = 'idle';
+    if (f.t >= m.start + m.active + m.rec * stat(F.indexOf(f), 'quick')) f.act = 'idle';
     if (onGround) f.vx *= 0.7;
     if (f.act === 'dash' && f.t >= m.start && f.t < m.start + m.active) { f.vx = f.face * 9; if (f.t === m.start) f.vy = 4; }
     f.x += f.vx; gravity(f); return false;
@@ -481,10 +495,10 @@ function updateFighter(f, o, held, latch) {
   if ((latch & BIT.s) && special(f, held)) { /* special started */ }
   else if (latch & BIT.p) startAttack(f, 'punch');
   else if (latch & BIT.k) startAttack(f, 'kick');
-  else if (((latch | held) & BIT.j) && onGround && !f.blk) f.vy = 15; // held up: jump again on landing
+  else if (((latch | held) & BIT.j) && onGround && !f.blk) f.vy = 15 * stat(F.indexOf(f), 'jump'); // held up: jump again on landing
   let dir = ((held & BIT.r) ? 1 : 0) - ((held & BIT.l) ? 1 : 0);
   if (f.blk || f.act !== 'idle') dir = 0;
-  if (onGround && f.act === 'idle') f.vx = dir * 4.6;
+  if (onGround && f.act === 'idle') f.vx = dir * 4.6 * stat(F.indexOf(f), 'speed');
   if (f.act === 'idle') f.x += f.vx;
   gravity(f);
   return true;
@@ -503,7 +517,7 @@ function separate() {
   if (b.x < 50 || b.x > W - 50) { b.x = clamp(b.x, 50, W - 50); a.x = b.x - s * min; }
 }
 
-function gain(f, n) { f.en = Math.min(100, f.en + n); }
+function gain(f, n) { f.en = Math.min(100, f.en + n * stat(F.indexOf(f), 'energy')); }
 
 function checkHit(i) {
   const f = F[i], o = F[1 - i];
@@ -533,7 +547,9 @@ function applyHit(i, m, x, y, dir) {
     return false;
   }
   o.combo = o.act === 'hit' ? o.combo + 1 : 1;
-  const dmg = Math.round(m.dmg * (o.combo > 3 ? 0.7 : 1)); // long combos hurt a bit less each hit
+  const kind = m === MOVES.punch ? 'punch' : m === MOVES.kick || m === MOVES.finish || m === MOVES.dive ? 'kick' : null;
+  const dmg = Math.round(m.dmg * (o.combo > 3 ? 0.7 : 1) // long combos hurt a bit less each hit
+    * (kind ? stat(i, kind) : 1) * stat(1 - i, 'def'));
   o.hp = Math.max(0, o.hp - dmg);
   o.act = 'hit'; o.t = m.stun; o.blk = false; o.vx = dir * m.kb;
   if (m.launch) o.vy = Math.max(o.vy, m.launch);
@@ -954,6 +970,9 @@ function renderSelect() {
       b.className = 'char'; b.style.setProperty('--c', c.col);
       b.innerHTML = '<canvas width="180" height="240"></canvas><span></span>';
       b.lastChild.textContent = c.name;
+      const perk = document.createElement('small');
+      perk.textContent = c.perk;
+      b.appendChild(perk);
       b.onclick = () => pick(k);
       box.appendChild(b);
       const saved = ctx, saveChars = chars;
