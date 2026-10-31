@@ -926,8 +926,12 @@ function createRoom() {
   const code = String(1000 + Math.floor(Math.random() * 9000));
   const p = new Peer(PREFIX + code);
   peer = p;
+  let opened = false;
+  keepServer(p);
   p.on('open', () => {
     if (peer !== p) return;
+    opened = true;
+    $('#hostErr').textContent = '';
     $('#code').textContent = code;
     $('#hostWait').textContent = 'תנו לחבר את הקוד. מחכים שיצטרף…';
     const join = new URL('./', location.href);
@@ -943,9 +947,30 @@ function createRoom() {
   p.on('error', e => {
     if (peer !== p) return;
     if (e.type === 'unavailable-id') { createRoom(); return; }
+    if (opened && !p.destroyed) return; // lost the server after the room was up: keepServer reconnects
     $('#hostErr').textContent = netMsg(e);
   });
 }
+
+// Switching to WhatsApp (or locking the phone) pauses the page and drops its link to the PeerJS server, which is
+// what lets a friend find the room by its code. Reconnect with the same id, so the code stays the same: right away
+// if the page is visible, otherwise as soon as it is again. An open game doesn't need the server, only waiting does.
+let serverRetry = null;
+function keepServer(p) {
+  let tries = 0, timer = null;
+  const retry = () => {
+    clearTimeout(timer);
+    if (peer !== p || p.destroyed || !p.disconnected || document.hidden) return;
+    if (++tries > 5) { $('#hostWait').textContent = ''; $('#hostErr').textContent = netMsg({ type: 'network' }); return; }
+    $('#hostWait').textContent = 'מתחבר מחדש לשרת…';
+    try { p.reconnect(); } catch (_) {}
+    timer = setTimeout(retry, 1500 * tries);
+  };
+  p.on('disconnected', () => { if (peer === p) timer = setTimeout(retry, 300); });
+  p.on('open', () => { tries = 0; });
+  serverRetry = () => { tries = 0; retry(); };
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && serverRetry) serverRetry(); });
 
 function joinRoom() {
   const code = $('#codeIn').value.replace(/\D/g, '');
