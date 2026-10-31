@@ -135,6 +135,14 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 .k.on{background:#ffffff4d;transform:scale(.93)}
 .k.up{margin-bottom:0} /* one flat row under the fighters, like the planning mode */
 .k.big{width:62px;height:62px}
+/* Movement joystick: drag the knob; sideways walks, up jumps, diagonally up does both. */
+.stick{position:relative;width:86px;height:86px;border-radius:50%;border:2px solid #fff5;background:#ffffff12;touch-action:none;cursor:pointer;flex:none}
+.stick .knob{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:#ffffff55;border:2px solid #fffa;box-shadow:0 2px 8px #0008;pointer-events:none}
+.stick.on .knob{background:#ffc94a99;border-color:var(--gold)}
+.stick .hint{position:absolute;font-style:normal;font-size:11px;color:#fff8;pointer-events:none}
+.stick .hint.l{left:6px;top:50%;margin-top:-8px}
+.stick .hint.r{right:6px;top:50%;margin-top:-8px}
+.stick .hint.u{top:3px;left:50%;margin-left:-5px}
 .k.punch{border-color:var(--red)}
 .k.kick{border-color:var(--gold)}
 .k.block{border-color:var(--blue)}
@@ -177,9 +185,10 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 
 <div id="pad" hidden>
   <div class="cluster">
-    <button class="k" data-k="l" aria-label="שמאלה"><span>◀</span></button>
-    <button class="k up" data-k="j" aria-label="קפיצה"><span>▲</span>קפיצה</button>
-    <button class="k" data-k="r" aria-label="ימינה"><span>▶</span></button>
+    <div class="stick" id="stick" aria-label="ג'ויסטיק: גוררים לצדדים להליכה, למעלה לקפיצה">
+      <i class="hint l">◀</i><i class="hint r">▶</i><i class="hint u">▲</i>
+      <div class="knob" id="knob"></div>
+    </div>
   </div>
   <div class="cluster">
     <button class="k block" data-k="b"><span>🛡️</span>הגנה</button>
@@ -845,6 +854,37 @@ document.querySelectorAll('.k[data-k]').forEach(el => {
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, up);
 });
 document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Joystick → the same l / r / j keys as before: past a small dead zone sideways walks, up past a bit more jumps.
+{
+  const stick = $('#stick'), knob = $('#knob'), R = 30;
+  let id = null;
+  const move = e => {
+    const r = stick.getBoundingClientRect();
+    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const d = Math.hypot(dx, dy);
+    if (d > R) { dx *= R / d; dy *= R / d; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    press('l', dx < -R * 0.35 ? 1 : 0);
+    press('r', dx > R * 0.35 ? 1 : 0);
+    press('j', dy < -R * 0.5 ? 1 : 0);
+  };
+  const end = e => {
+    if (e.pointerId !== id) return;
+    id = null; stick.classList.remove('on');
+    knob.style.transform = '';
+    press('l', 0); press('r', 0); press('j', 0);
+  };
+  stick.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (id !== null) return;
+    id = e.pointerId; stick.classList.add('on');
+    try { stick.setPointerCapture(id); } catch (_) {}
+    move(e);
+  });
+  stick.addEventListener('pointermove', e => { if (e.pointerId === id) move(e); });
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(t, end);
+}
 
 const KEYS = { KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r', KeyW: 'j', ArrowUp: 'j', Space: 'j', KeyS: 'b', ArrowDown: 'b', KeyJ: 'p', KeyK: 'k', KeyL: 's' };
 addEventListener('keydown', e => { if (KEYS[e.code] && role && e.target.tagName !== 'INPUT') { e.preventDefault(); press(KEYS[e.code], 1); } });

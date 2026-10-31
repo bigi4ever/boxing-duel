@@ -265,16 +265,21 @@ const PH = (() => {
     if (r.stun > 0) { r.target = t; return; }
     const fwd = r.face > 0 ? B.r : B.l, back = r.face > 0 ? B.l : B.r;
     const onGround = Math.min(r.B.shin0.getPosition().y, r.B.shin1.getPosition().y) < 0.4;
+    const dir = (held & fwd ? 1 : 0) - (held & back ? 1 : 0);
     if (!r.act) {
       if (taps & B.p) { r.act = r.lastPunch === 'punch' ? 'punch2' : 'punch'; r.lastPunch = r.act; r.actT = 0; }
       else if (taps & B.k) { r.act = 'kick'; r.actT = 0; }
       else if ((taps & B.j) && onGround) {
-        for (const p of PARTS) { const b = r.B[p], v = b.getLinearVelocity(); b.setLinearVelocity(V(v.x, 6.2)); }
+        // jumping while moving (joystick diagonal) takes off in that direction
+        for (const p of PARTS) { const b = r.B[p], v = b.getLinearVelocity(); b.setLinearVelocity(V(dir ? dir * r.face * 2.8 : v.x, 6.2)); }
       }
+    }
+    if (!onGround && dir) { // a little steering in the air
+      const t = r.B.torso, v = t.getLinearVelocity();
+      t.setLinearVelocity(V(v.x + (dir * r.face * 2.8 - v.x) * 0.05, v.y));
     }
     r.blocking = !r.act && !!(held & B.b);
     r.armed = !!r.act;
-    const dir = (held & fwd ? 1 : 0) - (held & back ? 1 : 0);
     if (r.act && r.act !== 'kick') r.moveDir = dir * r.face * 0.7; // can step in while punching
     if (r.act) {
       r.actT++;
