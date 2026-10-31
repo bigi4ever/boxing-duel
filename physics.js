@@ -319,7 +319,10 @@ const PH = (() => {
     r.speed = 16; r.act = null; r.armed = true;
     r.moveDir = (plan.move || 0) * r.face;
     const onGround = Math.min(r.B.shin0.getPosition().y, r.B.shin1.getPosition().y) < 0.4;
-    if (plan.jump && onGround) for (const p of PARTS) { const b = r.B[p], v = b.getLinearVelocity(); b.setLinearVelocity(V(v.x, 6.2)); }
+    if (plan.jump && onGround) for (const p of PARTS) { // a jump with a step takes off in that direction
+      const b = r.B[p], v = b.getLinearVelocity();
+      b.setLinearVelocity(V(plan.move ? plan.move * r.face * 2.8 : v.x, 6.2));
+    }
   }
 
   function currentAngles(r) {

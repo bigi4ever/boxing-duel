@@ -150,15 +150,44 @@ function updateTurnPad() {
   const show = mode === 'turns' && role && G && G.phase === 'fight' && G.tp === 'plan';
   $('#tpad').hidden = !show;
   if (!show || !myPlan) return;
-  document.querySelectorAll('#tpad [data-move]').forEach(b => b.classList.toggle('on', +b.dataset.move === myPlan.move));
-  $('#tJump').classList.toggle('on', myPlan.jump);
+  if (tstickId === null) showStickChoice();
   $('#tReady').disabled = myPlan.sent;
   $('#tReady').textContent = myPlan.sent ? 'מחכים ליריב…' : '✔ מוכן';
 }
-document.querySelectorAll('#tpad [data-move]').forEach(b => {
-  b.onclick = () => { if (planEditable()) { myPlan.move = +b.dataset.move; updateTurnPad(); } };
+
+// Movement for the planned move, by joystick like the other modes: sideways = step back / forward, up = jump,
+// diagonal = both. Unlike real time the choice stays when the finger lifts (the knob rests on it); dragging back
+// to the middle, or a light tap, means stay in place. My fighter always faces right on my own screen.
+let tstickId = null;
+const TR = 38;
+function showStickChoice() {
+  const set = myPlan && (myPlan.move || myPlan.jump);
+  $('#tknob').style.transform = set ? `translate(${myPlan.move * TR * 0.8}px, ${myPlan.jump ? -TR * 0.8 : 0}px)` : '';
+  $('#tstick').classList.toggle('set', !!set);
+}
+function tstickMove(e) {
+  const r = $('#tstick').getBoundingClientRect();
+  const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const d = Math.hypot(dx, dy), k = d > TR ? TR / d : 1;
+  $('#tknob').style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+  if (!planEditable()) return;
+  const out = d > TR * 0.3;
+  myPlan.move = out && dx > TR * 0.25 ? 1 : out && dx < -TR * 0.25 ? -1 : 0;
+  myPlan.jump = out && -dy > Math.abs(dx) * 0.47;
+}
+$('#tstick').addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (tstickId !== null || !planEditable()) return;
+  tstickId = e.pointerId; $('#tstick').classList.add('on');
+  try { $('#tstick').setPointerCapture(tstickId); } catch (_) {}
+  tstickMove(e);
 });
-$('#tJump').onclick = () => { if (planEditable()) { myPlan.jump = !myPlan.jump; updateTurnPad(); } };
+$('#tstick').addEventListener('pointermove', e => { if (e.pointerId === tstickId) tstickMove(e); });
+for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) $('#tstick').addEventListener(t, e => {
+  if (e.pointerId !== tstickId) return;
+  tstickId = null; $('#tstick').classList.remove('on');
+  showStickChoice();
+});
 $('#tReset').onclick = () => { planReset(); updateTurnPad(); };
 $('#tReady').onclick = planReady;
 

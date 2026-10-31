@@ -138,7 +138,7 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 /* Movement joystick: drag the knob; sideways walks, up jumps, diagonally up does both. */
 .stick{position:relative;width:108px;height:108px;border-radius:50%;border:2px solid #fff5;background:#ffffff12;touch-action:none;cursor:pointer;flex:none}
 .stick .knob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:#ffffff55;border:2px solid #fffa;box-shadow:0 2px 8px #0008;pointer-events:none}
-.stick.on .knob{background:#ffc94a99;border-color:var(--gold)}
+.stick.on .knob,.stick.set .knob{background:#ffc94a99;border-color:var(--gold)}
 .stick .hint{position:absolute;font-style:normal;font-size:13px;color:#fff8;pointer-events:none}
 .stick .hint.l{left:6px;top:50%;margin-top:-8px}
 .stick .hint.r{right:6px;top:50%;margin-top:-8px}
@@ -172,10 +172,10 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 
 <div id="tpad" hidden>
   <div class="cluster">
-    <button class="k tbtn" data-move="-1"><span>◀</span>אחורה</button>
-    <button class="k tbtn" data-move="0"><span>■</span>במקום</button>
-    <button class="k tbtn" data-move="1"><span>▶</span>קדימה</button>
-    <button class="k tbtn" id="tJump"><span>⤒</span>קפיצה</button>
+    <div class="stick" id="tstick" aria-label="ג'ויסטיק: לאן לזוז במהלך הזה">
+      <i class="hint l">◀</i><i class="hint r">▶</i><i class="hint u">▲</i>
+      <div class="knob" id="tknob"></div>
+    </div>
   </div>
   <div class="cluster">
     <button class="k tbtn" id="tReset"><span>↺</span>איפוס</button>
