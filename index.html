@@ -136,10 +136,10 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 .k.up{margin-bottom:0} /* one flat row under the fighters, like the planning mode */
 .k.big{width:62px;height:62px}
 /* Movement joystick: drag the knob; sideways walks, up jumps, diagonally up does both. */
-.stick{position:relative;width:86px;height:86px;border-radius:50%;border:2px solid #fff5;background:#ffffff12;touch-action:none;cursor:pointer;flex:none}
-.stick .knob{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:#ffffff55;border:2px solid #fffa;box-shadow:0 2px 8px #0008;pointer-events:none}
+.stick{position:relative;width:108px;height:108px;border-radius:50%;border:2px solid #fff5;background:#ffffff12;touch-action:none;cursor:pointer;flex:none}
+.stick .knob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:#ffffff55;border:2px solid #fffa;box-shadow:0 2px 8px #0008;pointer-events:none}
 .stick.on .knob{background:#ffc94a99;border-color:var(--gold)}
-.stick .hint{position:absolute;font-style:normal;font-size:11px;color:#fff8;pointer-events:none}
+.stick .hint{position:absolute;font-style:normal;font-size:13px;color:#fff8;pointer-events:none}
 .stick .hint.l{left:6px;top:50%;margin-top:-8px}
 .stick .hint.r{right:6px;top:50%;margin-top:-8px}
 .stick .hint.u{top:3px;left:50%;margin-left:-5px}
@@ -856,18 +856,19 @@ document.querySelectorAll('.k[data-k]').forEach(el => {
 document.addEventListener('contextmenu', e => e.preventDefault());
 
 // Joystick → the same l / r / j keys as before: past a small dead zone sideways walks, up past a bit more jumps.
+// Directions come from where the finger really is (not the knob, which stops at the rim), so sliding up a little
+// while already pushed all the way sideways still jumps.
 {
-  const stick = $('#stick'), knob = $('#knob'), R = 30;
+  const stick = $('#stick'), knob = $('#knob'), R = 38;
   let id = null;
   const move = e => {
     const r = stick.getBoundingClientRect();
-    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-    const d = Math.hypot(dx, dy);
-    if (d > R) { dx *= R / d; dy *= R / d; }
-    knob.style.transform = `translate(${dx}px, ${dy}px)`;
-    press('l', dx < -R * 0.35 ? 1 : 0);
-    press('r', dx > R * 0.35 ? 1 : 0);
-    press('j', dy < -R * 0.5 ? 1 : 0);
+    const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const d = Math.hypot(dx, dy), k = d > R ? R / d : 1;
+    knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+    press('l', dx < -R * 0.3 ? 1 : 0);
+    press('r', dx > R * 0.3 ? 1 : 0);
+    press('j', dy < -R * 0.35 ? 1 : 0);
   };
   const end = e => {
     if (e.pointerId !== id) return;

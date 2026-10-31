@@ -264,12 +264,16 @@ const PH = (() => {
     r.moveDir = 0; r.lean = 0; r.speed = 14;
     if (r.stun > 0) { r.target = t; return; }
     const fwd = r.face > 0 ? B.r : B.l, back = r.face > 0 ? B.l : B.r;
-    const onGround = Math.min(r.B.shin0.getPosition().y, r.B.shin1.getPosition().y) < 0.4;
+    const onGround = Math.min(r.B.shin0.getPosition().y, r.B.shin1.getPosition().y) < 0.45;
     const dir = (held & fwd ? 1 : 0) - (held & back ? 1 : 0);
+    // a jump pressed mid-stride (a foot in the air) is kept for a moment and happens on the next step down
+    if (taps & B.j) r.jumpBuf = 12;
+    else if (r.jumpBuf > 0) r.jumpBuf--;
     if (!r.act) {
       if (taps & B.p) { r.act = r.lastPunch === 'punch' ? 'punch2' : 'punch'; r.lastPunch = r.act; r.actT = 0; }
       else if (taps & B.k) { r.act = 'kick'; r.actT = 0; }
-      else if ((taps & B.j) && onGround) {
+      else if (r.jumpBuf > 0 && onGround) {
+        r.jumpBuf = 0;
         // jumping while moving (joystick diagonal) takes off in that direction
         for (const p of PARTS) { const b = r.B[p], v = b.getLinearVelocity(); b.setLinearVelocity(V(dir ? dir * r.face * 2.8 : v.x, 6.2)); }
       }
