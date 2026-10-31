@@ -41,10 +41,9 @@ function physTick(fight) {
     stepWorld();
     if (--G.tt <= 0) {
       G.turn++; G.tp = 'plan'; G.tt = TURN.PLAN; G.ready = [0, 0]; plans = [null, null];
+      regen(2); // the physics clock only runs during moves, so the recovery ability works per move here
     }
   }
-  if (fight && G.phase === 'fight' && PW.tick % 120 === 0) // regen ability
-    PW.rag.forEach((r, i) => { if (stat(i, 'regen') && !r.ko && r.hp > 0) r.hp = Math.min(maxHp(), r.hp + stat(i, 'regen')); });
   PW.rag.forEach((r, i) => {
     Object.assign(F[i], { hp: r.hp, en: 0, x: PH.centerX(r), y: 0, act: r.ko ? 'ko' : r.act || 'idle' });
   });
@@ -53,6 +52,11 @@ function physTick(fight) {
 
 function stepWorld() {
   for (const e of PH.step(PW)) emit({ k: e.k, w: e.w, x: e.x, y: GROUND - e.y * PH.SCALE, big: e.big });
+  if (mode === 'phys' && G.phase === 'fight' && PW.tick % 120 === 0) regen(1); // recovery ability: 1 health per 2 s
+}
+
+function regen(n) {
+  PW.rag.forEach((r, i) => { if (stat(i, 'regen') && !r.ko && r.hp > 0) r.hp = Math.min(maxHp(), r.hp + n * stat(i, 'regen')); });
 }
 
 function submitPlan(i, p) {

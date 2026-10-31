@@ -177,7 +177,8 @@ const PH = (() => {
       const touch = W.touch && vital ? (h.dpart === 'head' ? 2 : 1) : 0;
       if (over <= 0 && !touch) continue;
       const power = /^(farm|uarm)/.test(h.part) ? A.st.punch : /^(shin|thigh)/.test(h.part) ? A.st.kick : 1;
-      const dmg = Math.max(touch, Math.min(30, Math.round(Math.max(0, over) * 3.2 * (TAKES[h.dpart] || 0.3) * power * D.st.def)));
+      // the cap applies before the fighters' abilities, so a maxed-out hit still feels them
+      const dmg = Math.max(touch, Math.round(Math.min(24, Math.max(0, over) * 3.2 * (TAKES[h.dpart] || 0.3)) * power * D.st.def));
       if (dmg < 1) continue;
       A.cool[h.part] = W.tick + 14;
       D.hp = Math.max(0, D.hp - dmg);
@@ -216,7 +217,10 @@ const PH = (() => {
     const wm = c.getWorldManifold(null);
     const pt = wm && wm.points && wm.points[0] ? wm.points[0] : fa.getBody().getPosition();
     for (const [def, by] of [[a, b], [b, a]]) {
-      if ((def.part === 'head' || def.part === 'torso') && pushing(W.rag[by.f], by.part)) W.press.push({ def: def.f, dpart: def.part, n, x: pt.x, y: pt.y });
+      if ((def.part === 'head' || def.part === 'torso') && pushing(W.rag[by.f], by.part)) {
+        const st = W.rag[by.f].st, power = /^(farm|uarm)/.test(by.part) ? st.punch : /^(shin|thigh)/.test(by.part) ? st.kick : 1;
+        W.press.push({ def: def.f, dpart: def.part, n, power, x: pt.x, y: pt.y });
+      }
     }
   }
 
@@ -228,7 +232,7 @@ const PH = (() => {
       const D = W.rag[p.def];
       if (D.ko) continue;
       const head = p.dpart === 'head';
-      D.pdmg += p.n * (head ? 1.2 : 0.6) * D.st.def;
+      D.pdmg += p.n * (head ? 1.2 : 0.6) * p.power * D.st.def;
       if (head) D.neck += p.n;
       D.lastPress = p;
     }
