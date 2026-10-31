@@ -15,7 +15,8 @@ let drag = null;
 
 // ---------- host / practice ----------
 function physStart() {
-  PW = PH.newMatchWorld({ touch: mode === 'turns', hp: maxHp(), stats: [statsOf(0), statsOf(1)] });
+  // abilities are for the live modes; in the planning mode all fighters are equal
+  PW = PH.newMatchWorld({ touch: mode === 'turns', hp: maxHp(), stats: mode === 'turns' ? null : [statsOf(0), statsOf(1)] });
   RV = PH.pack(PW);
   plans = [null, null];
   Object.assign(G, { tp: mode === 'turns' ? 'plan' : null, tt: TURN.PLAN, turn: 1, ready: [0, 0] });
@@ -41,7 +42,6 @@ function physTick(fight) {
     stepWorld();
     if (--G.tt <= 0) {
       G.turn++; G.tp = 'plan'; G.tt = TURN.PLAN; G.ready = [0, 0]; plans = [null, null];
-      regen(2); // the physics clock only runs during moves, so the recovery ability works per move here
     }
   }
   PW.rag.forEach((r, i) => {

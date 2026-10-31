@@ -91,6 +91,7 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 @media (max-width:560px){.chars{grid-template-columns:repeat(3,1fr)}}
 .char{background:#120e1c;border:2px solid var(--line);border-radius:12px;padding:4px 2px 6px;color:var(--ink);font:500 14px var(--body);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
 .char canvas{width:100%;max-width:90px;aspect-ratio:3/4;display:block}
+.chars.noperk .char small{display:none}
 .char small{font-size:10.5px;color:var(--muted);line-height:1.15;text-align:center;padding:0 2px}
 .char.mine{border-color:var(--c);box-shadow:0 0 0 2px var(--c),0 0 18px var(--c)}
 .char.theirs::after{content:'היריב';font-size:11px;color:var(--muted)}
@@ -984,6 +985,7 @@ function renderSelect() {
       ctx = saved; chars = saveChars;
     });
   }
+  box.classList.toggle('noperk', mode === 'turns'); // no abilities in the planning mode
   [...box.children].forEach((b, k) => {
     b.classList.toggle('mine', picks[me] === k);
     b.classList.toggle('theirs', role !== 'solo' && picks[1 - me] === k);
