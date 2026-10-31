@@ -47,6 +47,21 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .sub{color:var(--muted);margin:0 0 12px;font-size:15px;line-height:1.4}
 .btn{display:block;width:100%;font:500 17px var(--body);padding:12px 16px;margin:8px 0;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);cursor:pointer}
 .row{display:flex;gap:8px}
+.selhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.selhead h2{margin:0}
+.modes{display:flex;gap:6px;justify-content:center}
+.mode{font:500 14px var(--body);color:var(--ink);background:#120e1c;border:2px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.mode.on{border-color:var(--gold);background:#2a2140;box-shadow:0 0 12px #ffc94a55}
+.mode:disabled{cursor:default}
+.mode:disabled:not(.on){opacity:.45}
+#turnInfo{font:500 12px var(--body);color:var(--gold);white-space:nowrap;margin-top:2px;text-shadow:0 1px 2px #000}
+#tpad{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:flex-end;direction:ltr;z-index:5;pointer-events:none;
+  padding:0 calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+.k.tbtn{width:58px;height:58px;font-size:11px}
+.k.tbtn span{font-size:20px}
+.k.tbtn.on{background:#ffc94a55;border-color:var(--gold)}
+.btn.tready{width:auto;margin:0;padding:14px 22px;font-size:18px;pointer-events:auto}
+body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode="turns"] .bar.en{display:none}
 .btn.small{font-size:15px;padding:8px 10px;margin:4px 0}
 /* Sound switches and install sit beside the menu card, not in it, so the card fits a phone held sideways. */
 .corner{position:absolute;top:calc(10px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));display:flex;flex-direction:column;gap:6px;width:auto}
@@ -60,7 +75,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
   .sub{font-size:14px;margin-bottom:6px}
   .btn{padding:9px 14px;margin:6px 0;font-size:16px}
   h2{font-size:22px;margin-bottom:4px}
-  .char canvas{max-width:64px}
+  .chars .char canvas{max-width:64px}
   .moves{font-size:14px;line-height:1.35;columns:2;column-gap:18px}
   .moves li{padding:4px 0;break-inside:avoid}
   .chars{margin:2px 0 4px}
@@ -141,10 +156,23 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 
 <div id="hud" hidden>
   <div class="side me"><div class="name"><span id="meName">אתה</span><span class="pips" id="pipsMe"><b></b><b></b></span></div><div class="bar"><i id="hpMe"></i></div><div class="bar en"><i id="enMe"></i></div></div>
-  <div class="mid"><div id="timer">60</div><div id="roomScore" hidden></div><button class="mini" data-sound="music" aria-label="מוזיקה">🎵</button></div>
+  <div class="mid"><div id="timer">60</div><div id="turnInfo" hidden></div><div id="roomScore" hidden></div><button class="mini" data-sound="music" aria-label="מוזיקה">🎵</button></div>
   <div class="side opp"><div class="name"><span id="oppName">יריב</span><span class="pips" id="pipsOpp"><b></b><b></b></span></div><div class="bar"><i id="hpOpp"></i></div><div class="bar en"><i id="enOpp"></i></div></div>
 </div>
 <div id="banner"></div>
+
+<div id="tpad" hidden>
+  <div class="cluster">
+    <button class="k tbtn" data-move="-1"><span>◀</span>אחורה</button>
+    <button class="k tbtn" data-move="0"><span>■</span>במקום</button>
+    <button class="k tbtn" data-move="1"><span>▶</span>קדימה</button>
+    <button class="k tbtn" id="tJump"><span>⤒</span>קפיצה</button>
+  </div>
+  <div class="cluster">
+    <button class="k tbtn" id="tReset"><span>↺</span>איפוס</button>
+    <button class="btn primary tready" id="tReady">✔ מוכן</button>
+  </div>
+</div>
 
 <div id="pad" hidden>
   <div class="cluster">
@@ -220,7 +248,14 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 
 <section class="screen" id="selectScr" hidden>
   <div class="card wide">
-    <h2>בחרו לוחם</h2>
+    <div class="selhead">
+      <h2>בחרו לוחם</h2>
+      <div class="modes" id="modes">
+        <button class="mode" data-mode="classic">🥊 קלאסי</button>
+        <button class="mode" data-mode="phys">🤸 פיזיקה</button>
+        <button class="mode" data-mode="turns">♟️ תורות</button>
+      </div>
+    </div>
     <div class="chars" id="chars"></div>
     <p class="lead" id="selectLead" hidden></p>
     <p class="sub" id="selectWait"></p>
@@ -300,6 +335,7 @@ let P = [];               // fireballs in flight: { x, y (height above the mat),
 let inp = [{ held: 0, latch: 0, age: 0 }, { held: 0, latch: 0, age: 0 }];
 let outbox = [], sparks = [], texts = [], shake = 0, tick = 0;
 let score = [0, 0];       // matches won by each fighter since the room was opened (online only)
+let mode = 'classic';     // 'classic' | 'phys' (ragdolls, real time) | 'turns' (ragdolls, planned turns) — physmode.js
 
 function newFighter(i, en = 0) {
   return { x: i ? 680 : 320, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, hp: MAX_HP, en, act: 'idle', t: 0,
@@ -324,6 +360,7 @@ function startRound() {
   P = [];
   inp = [{ held: inp[0].held, latch: 0, age: 0 }, { held: inp[1].held, latch: 0, age: 0 }];
   Object.assign(G, { phase: 'intro', t: 100, timer: 3600 });
+  if (mode !== 'classic') physStart();
   setMsg({ k: 'round', n: G.round }, 60);
 }
 
@@ -332,18 +369,21 @@ function setMsg(m, t) { G.msg = m; G.msgT = t; }
 function step() {
   tick++;
   const fight = G.phase === 'fight';
-  if (role === 'solo') setHeld(1, fight ? botBits(F[1], F[0]) : 0);
-  for (let i = 0; i < 2; i++) {
-    const held = fight ? inp[i].held : 0, latch = fight ? inp[i].latch : 0;
-    // A tap made while still busy (hit, mid-attack) is kept for a few ticks so it isn't lost.
-    if (updateFighter(F[i], F[1 - i], held, latch) || !fight || ++inp[i].age > 10) { inp[i].latch = 0; inp[i].age = 0; }
+  if (mode !== 'classic') physTick(fight);
+  else {
+    if (role === 'solo') setHeld(1, fight ? botBits(F[1], F[0]) : 0);
+    for (let i = 0; i < 2; i++) {
+      const held = fight ? inp[i].held : 0, latch = fight ? inp[i].latch : 0;
+      // A tap made while still busy (hit, mid-attack) is kept for a few ticks so it isn't lost.
+      if (updateFighter(F[i], F[1 - i], held, latch) || !fight || ++inp[i].age > 10) { inp[i].latch = 0; inp[i].age = 0; }
+    }
+    separate();
+    checkHit(0); checkHit(1);
+    moveBalls();
   }
-  separate();
-  checkHit(0); checkHit(1);
-  moveBalls();
 
   if (G.phase === 'fight') {
-    G.timer--;
+    if (mode !== 'turns') G.timer--; // in turns the round ends after the last turn (physTick)
     if (F[0].act === 'ko' || F[1].act === 'ko' || G.timer <= 0) endRound();
   } else if (G.phase === 'intro') {
     if (--G.t <= 0) { G.phase = 'fight'; setMsg({ k: 'fight' }, 45); }
@@ -539,7 +579,7 @@ function botBits(b, p) {
     else if (d < 110 && b.en >= 60 && Math.random() < 0.25) { h = toward | BIT.s; bot.cd = 60; }
     else if (d < 130) {
       h |= d < 95 && Math.random() < 0.7 ? BIT.p : BIT.k;
-      bot.cd = 28 + Math.floor(Math.random() * 45);
+      bot.cd = Math.floor((28 + Math.random() * 45) * (mode === 'classic' ? 1 : 1.9)); // ragdoll hits land harder: attack less often
     } else bot.cd = 0;
   }
   if (Math.random() < 0.004) h |= BIT.j;
@@ -785,7 +825,7 @@ function press(key, v) {
 
 function releaseAll() { for (const k in held) press(k, 0); }
 
-document.querySelectorAll('.k').forEach(el => {
+document.querySelectorAll('.k[data-k]').forEach(el => {
   const key = el.dataset.k, ids = new Set();
   btnEls[key] = el;
   el.addEventListener('pointerdown', e => {
@@ -817,7 +857,7 @@ function cleanupNet() {
 
 function toMenu() {
   cleanupNet(); releaseAll();
-  role = null; me = 0; G = null; P = []; selecting = false;
+  role = null; me = 0; G = null; P = []; selecting = false; mode = 'classic'; document.body.dataset.mode = '';
   F = [newFighter(0), newFighter(1)];
   $('#hud').hidden = $('#pad').hidden = true;
   $('#banner').textContent = '';
@@ -877,10 +917,15 @@ function renderSelect() {
     b.classList.toggle('mine', picks[me] === k);
     b.classList.toggle('theirs', role !== 'solo' && picks[1 - me] === k);
   });
+  document.querySelectorAll('#modes .mode').forEach(b => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+    b.disabled = role === 'guest';
+  });
   const lead = leadText();
   $('#selectLead').hidden = !lead; $('#selectLead').textContent = lead;
   const wait = $('#selectWait');
   if (role === 'solo') wait.textContent = 'המחשב יקבל לוחם אחר באקראי';
+  else if (role === 'guest' && picks[me] === null) wait.textContent = 'את סוג הקרב בוחר מי שפתח את החדר. ' + (picks[0] === null ? 'שניכם בוחרים לוחם' : 'היריב כבר בחר. תורך!');
   else if (picks[me] === null) wait.textContent = picks[1 - me] === null ? 'שניכם בוחרים עכשיו' : 'היריב כבר בחר. תורך!';
   else wait.textContent = 'מחכים שהיריב יבחר…';
 }
@@ -900,7 +945,7 @@ function pick(k) {
 function tryStart() {
   if (picks[0] === null || picks[1] === null) return;
   chars = [...picks];
-  send({ t: 'go', c: chars });
+  send({ t: 'go', c: chars, m: mode });
   beginMatch();
 }
 
@@ -908,7 +953,10 @@ function beginMatch() {
   selecting = false;
   sparks = []; texts = []; outbox = []; P = [];
   showScreen(null);
-  $('#hud').hidden = $('#pad').hidden = false;
+  $('#hud').hidden = false;
+  $('#pad').hidden = mode === 'turns';
+  document.body.dataset.mode = mode;
+  RV = RT = myPlan = null;
   $('#meName').textContent = 'אתה · ' + charOf(me).name;
   $('#oppName').textContent = (role === 'solo' ? 'מחשב' : 'יריב') + ' · ' + charOf(1 - me).name;
   $('#hpMe').style.background = colorOf(me);
@@ -1018,7 +1066,9 @@ function lostConn() {
 const packF = f => [Math.round(f.x * 10) / 10, Math.round(f.y * 10) / 10, f.face, f.hp, ACTS.indexOf(f.act), f.t, f.blk ? 1 : 0, Math.floor(f.en)];
 
 function sendSnap() {
-  send({ t: 's', f: F.map(packF), g: [G.phase, G.timer, G.round, G.wins, G.msg, score], b: P.map(b => [Math.round(b.x), Math.round(b.y), b.dir, b.o]), e: outbox });
+  const snap = { t: 's', f: F.map(packF), g: [G.phase, G.timer, G.round, G.wins, G.msg, score], b: P.map(b => [Math.round(b.x), Math.round(b.y), b.dir, b.o]), e: outbox };
+  if (mode !== 'classic' && RV) { snap.r = RV; snap.q = [G.tp, G.tt, G.turn, G.ready]; }
+  send(snap);
   outbox = [];
 }
 
@@ -1028,10 +1078,13 @@ function onData(d) {
     if (d.t === 'in') setHeld(1, d.h | 0);
     else if (d.t === 'again' && G && G.phase === 'over') startMatch();
     else if (d.t === 'pick' && selecting) { picks[1] = d.c | 0; renderSelect(); tryStart(); }
+    else if (d.t === 'plan' && mode === 'turns') submitPlan(1, d.p);
   } else if (role === 'guest' && d.t === 'pick') {
     picks[0] = d.c; renderSelect();
+  } else if (role === 'guest' && d.t === 'mode') {
+    mode = d.m; renderSelect();
   } else if (role === 'guest' && d.t === 'go') {
-    chars = d.c; beginMatch();
+    chars = d.c; mode = d.m || 'classic'; beginMatch();
   } else if (role === 'guest' && d.t === 's' && !selecting) {
     if (!F.length) F = [newFighter(0), newFighter(1)].map(f => Object.assign(f, { tx: null }));
     d.f.forEach((a, i) => {
@@ -1043,6 +1096,7 @@ function onData(d) {
     score = sc;
     G = { phase, timer, round, wins, msg };
     P = d.b.map(([x, y, dir, o]) => ({ x, y, dir, o }));
+    if (d.r) physSnapshot(d);
     d.e.forEach(onEvent);
   }
 }
@@ -1057,6 +1111,12 @@ $('#reselectBtn').onclick = () => { send({ t: 'reselect' }); openSelect(); };
 document.querySelectorAll('[data-menu]').forEach(b => { b.onclick = toMenu; });
 document.querySelectorAll('[data-screen]').forEach(b => { b.onclick = () => showScreen(b.dataset.screen); });
 document.querySelectorAll('[data-sound]').forEach(b => { b.onclick = () => toggleSound(b.dataset.sound); });
+document.querySelectorAll('#modes .mode').forEach(b => {
+  b.onclick = () => {
+    if (role === 'guest' || (typeof PH === 'undefined' || !PH) && b.dataset.mode !== 'classic') return;
+    mode = b.dataset.mode; send({ t: 'mode', m: mode }); renderSelect();
+  };
+});
 // Share the game's address on WhatsApp (opens the app on a phone, WhatsApp Web on a computer).
 const waLink = text => 'https://wa.me/?text=' + encodeURIComponent(text);
 $('#shareBtn').href = waLink('בוא נתאגרף! 🥊 דו־קרב, משחק קרבות לשני טלפונים:\n' + new URL('./', location.href).href);
@@ -1313,7 +1373,7 @@ function msgText(m) {
     case 'round': return 'סיבוב ' + m.n;
     case 'fight': return 'קרב!';
     case 'ko': return 'נוקאאוט!';
-    case 'time': return 'נגמר הזמן';
+    case 'time': return mode === 'turns' ? 'נגמרו התורות' : 'נגמר הזמן';
   }
   return '';
 }
@@ -1337,6 +1397,7 @@ function updateHud() {
   $('#enOpp').style.width = (opp.en || 0) + '%';
   btnEls.s.classList.toggle('ready', (mine.en || 0) >= MOVES.dive.cost);
   $('#timer').textContent = Math.ceil(Math.max(0, G.timer) / 60);
+  if (mode !== 'classic') physHud();
   const rs = $('#roomScore'), online = role === 'host' || role === 'guest';
   rs.hidden = !online;
   if (online) rs.innerHTML = `<b>${score[me]} : ${score[1 - me]}</b>קרבות בחדר`; // mine on the left, like the health bars
@@ -1376,7 +1437,7 @@ function render(dt, now) {
     if (f.moving) f.walk += 0.22 * Math.abs(v);
     // swing and jump sounds, from what the fighter is doing (works the same on host and guest)
     if (role && f.act !== f.pa) {
-      if (f.act === 'punch') sfx('whoosh');
+      if (f.act === 'punch' || f.act === 'punch2') sfx('whoosh');
       else if (f.act === 'kick' || f.act === 'finish') sfx('whooshBig');
     }
     if (role && f.act === 'idle' && f.y > 0 && !(f.py > 0)) sfx('jump');
@@ -1399,7 +1460,8 @@ function render(dt, now) {
   if (me === 1) { ctx.translate(W, 0); ctx.scale(-1, 1); }
 
   drawArena();
-  if (F.length) {
+  if (mode !== 'classic' && role && !selecting) renderPhys(now);
+  else if (F.length) {
     // the one that's attacking is drawn on top
     const order = ATTACKS.includes(F[0].act) || F[0].act === 'dive' ? [1, 0] : [0, 1];
     order.forEach(i => drawFighter(F[i], i, now));
@@ -1452,5 +1514,8 @@ if (!inApp && navigator.getInstalledRelatedApps) {
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
+<script src="https://unpkg.com/planck@1.4.2/dist/planck.min.js"></script>
+<script src="physics.js"></script>
+<script src="physmode.js"></script>
 </body>
 </html>

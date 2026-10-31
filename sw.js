@@ -1,16 +1,18 @@
 // Offline support for the installed app. Only this game's own files, the PeerJS script and the fonts are cached;
 // everything else (the PeerJS server's calls) always goes to the network.
 // Pages: network first, so a new version arrives on the next open; the cache is the offline fallback.
-const CACHE = 'boxing-duel-v9';
+const CACHE = 'boxing-duel-v11';
 const CORE = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './physics.js',
+  './physmode.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
 ];
-const CACHEABLE = ['https://unpkg.com/peerjs@', 'https://fonts.googleapis.com/', 'https://fonts.gstatic.com/'];
+const CACHEABLE = ['https://unpkg.com/peerjs@', 'https://unpkg.com/planck@', 'https://fonts.googleapis.com/', 'https://fonts.gstatic.com/'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
@@ -39,7 +41,7 @@ self.addEventListener('fetch', e => {
   const own = url.origin === location.origin;
   if (!own && !CACHEABLE.some(p => req.url.startsWith(p))) return;
 
-  const isPage = req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/') || url.pathname.endsWith('.webmanifest');
+  const isPage = req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/') || url.pathname.endsWith('.webmanifest') || url.pathname.endsWith('.js');
   if (own && isPage) {
     e.respondWith(
       fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => save(req, res))
