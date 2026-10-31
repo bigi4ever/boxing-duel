@@ -129,12 +129,12 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 #pad{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:flex-end;direction:ltr;z-index:5;pointer-events:none;
   padding:0 calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
 .cluster{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
-.k{width:68px;height:68px;border-radius:50%;border:2px solid #fff5;background:#ffffff1a;color:#fff;font:500 12px var(--body);
+.k{width:54px;height:54px;border-radius:50%;border:2px solid #fff5;background:#ffffff1a;color:#fff;font:500 10px var(--body);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;touch-action:none;cursor:pointer;padding:0}
-.k span{font-size:26px;line-height:1}
+.k span{font-size:20px;line-height:1}
 .k.on{background:#ffffff4d;transform:scale(.93)}
-.k.up{margin-bottom:46px}
-.k.big{width:80px;height:80px}
+.k.up{margin-bottom:0} /* one flat row under the fighters, like the planning mode */
+.k.big{width:62px;height:62px}
 .k.punch{border-color:var(--red)}
 .k.kick{border-color:var(--gold)}
 .k.block{border-color:var(--blue)}
@@ -1436,10 +1436,10 @@ function updateHud() {
   }
 }
 
-// Where the arena sits on screen. In the planning mode it's drawn smaller and higher, leaving room under the
-// fighters' feet for the buttons, so every handle on the body can be reached.
+// Where the arena sits on screen. During a match it's drawn smaller and higher, leaving room under the
+// fighters' feet for the buttons (and in the planning mode, every handle on the body can be reached).
 function view() {
-  const below = mode === 'turns' && role && !selecting ? 90 : 0;
+  const below = role && !selecting ? 90 : 0;
   const sc = Math.min(cw / W, ch / (H + below));
   return { sc, ox: (cw - W * sc) / 2, oy: (ch - (H + below) * sc) / 2 };
 }
