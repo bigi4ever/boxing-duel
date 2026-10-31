@@ -46,6 +46,11 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .sub{color:var(--muted);margin:0 0 12px;font-size:15px;line-height:1.4}
 .btn{display:block;width:100%;font:500 17px var(--body);padding:12px 16px;margin:8px 0;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);cursor:pointer}
 .row{display:flex;gap:8px}
+.btn.small{font-size:15px;padding:8px 10px;margin:4px 0}
+.btn.off{opacity:.55}
+.mid{display:flex;flex-direction:column;align-items:center}
+.mini{pointer-events:auto;margin-top:4px;width:30px;height:30px;border-radius:50%;border:1px solid #fff3;background:#0005;font-size:14px;line-height:1;padding:0;cursor:pointer}
+.mini.off{opacity:.5}
 .card.wide{width:min(680px,100%)}
 .chars{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:4px 0 8px}
 @media (max-width:560px){.chars{grid-template-columns:repeat(3,1fr)}}
@@ -60,6 +65,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .codein{font:400 38px var(--display);letter-spacing:10px;text-align:center;width:100%;direction:ltr;padding:6px;border-radius:12px;border:1px solid var(--line);background:#120e1c;color:var(--ink);-webkit-user-select:text;user-select:text}
 .err{color:var(--red);min-height:1.3em;margin:4px 0 0;font-size:15px}
 .keys.install{color:var(--gold);font-size:14px}
+@media (pointer:coarse){.keys:not(.install){display:none}}
 .keys{color:var(--muted);font-size:13px;margin:10px 0 0}
 
 #hud{position:fixed;top:0;left:0;right:0;display:flex;align-items:flex-start;gap:14px;direction:ltr;z-index:5;pointer-events:none;
@@ -116,7 +122,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 
 <div id="hud" hidden>
   <div class="side me"><div class="name"><span id="meName">אתה</span><span class="pips" id="pipsMe"><b></b><b></b></span></div><div class="bar"><i id="hpMe"></i></div><div class="bar en"><i id="enMe"></i></div></div>
-  <div class="mid"><div id="timer">60</div><div id="roomScore" hidden></div></div>
+  <div class="mid"><div id="timer">60</div><div id="roomScore" hidden></div><button class="mini" data-sound="music" aria-label="מוזיקה">🎵</button></div>
   <div class="side opp"><div class="name"><span id="oppName">יריב</span><span class="pips" id="pipsOpp"><b></b><b></b></span></div><div class="bar"><i id="hpOpp"></i></div><div class="bar en"><i id="enOpp"></i></div></div>
 </div>
 <div id="banner"></div>
@@ -147,6 +153,10 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
     </div>
     <button class="btn" id="installBtn" hidden>📲 התקנה כאפליקציה</button>
     <p class="keys install" id="installNote" hidden></p>
+    <div class="row">
+      <button class="btn small" data-sound="music">🎵 מוזיקה</button>
+      <button class="btn small" data-sound="sfx">🔊 צלילים</button>
+    </div>
     <p class="keys">במחשב: A/D תזוזה · W קפיצה · S הגנה · J אגרוף · K בעיטה · L מיוחד</p>
   </div>
 </section>
@@ -516,35 +526,203 @@ function botBits(b, p) {
 }
 
 // ---------- effects ----------
-let ac = null, noiseBuf = null;
+// ---------- sound & music ----------
+// Everything is synthesized with Web Audio, no sound files. Two volume buses (music, effects) that can be muted
+// separately; the choice is remembered on this phone. Audio starts on the first tap (browsers require one).
+let ac = null, noiseBuf = null, musicBus = null, sfxBus = null;
+const sound = { music: true, sfx: true };
+try { Object.assign(sound, JSON.parse(localStorage.getItem('boxing-duel-sound') || '{}')); } catch (_) {}
+
 function audio() {
   try {
     if (!ac) {
       ac = new (window.AudioContext || window.webkitAudioContext)();
-      noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.2, ac.sampleRate);
+      noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
       const d = noiseBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const comp = ac.createDynamicsCompressor();
+      comp.connect(ac.destination);
+      musicBus = ac.createGain(); musicBus.connect(comp);
+      sfxBus = ac.createGain(); sfxBus.connect(comp);
+      applySound();
+      music.next = ac.currentTime + 0.1;
+      music.timer = setInterval(schedule, 25);
     }
-    if (ac.state === 'suspended') ac.resume();
+    if (ac.state === 'suspended' && !document.hidden) ac.resume();
   } catch (e) { ac = null; }
 }
+addEventListener('pointerdown', audio, { capture: true });
+addEventListener('keydown', audio, { capture: true });
+document.addEventListener('visibilitychange', () => {
+  if (!ac) return;
+  if (document.hidden) ac.suspend(); else ac.resume();
+});
 
-function tone(type, f0, f1, dur, vol) {
-  const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
-  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
+function applySound() {
+  if (musicBus) musicBus.gain.setTargetAtTime(sound.music ? 0.5 : 0, ac.currentTime, 0.05);
+  if (sfxBus) sfxBus.gain.setTargetAtTime(sound.sfx ? 0.9 : 0, ac.currentTime, 0.02);
+  document.querySelectorAll('[data-sound]').forEach(b => {
+    const k = b.dataset.sound, on = sound[k];
+    b.classList.toggle('off', !on);
+    b.textContent = k === 'music' ? (on ? '🎵 מוזיקה' : '🎵 בלי מוזיקה') : (on ? '🔊 צלילים' : '🔇 בלי צלילים');
+    if (b.classList.contains('mini')) b.textContent = on ? '🎵' : '🔇';
+  });
 }
 
-function sfx(k) {
-  if (!ac) return;
-  if (k === 'blk') { tone('square', 900, 420, 0.06, 0.08); return; }
-  if (k === 'sp') { tone('sawtooth', 220, 880, 0.22, 0.12); return; }
-  if (k === 'fin') { tone('square', 330, 990, 0.3, 0.12); return; }
-  tone('triangle', k === 'ko' ? 160 : 200, 45, k === 'ko' ? 0.5 : 0.14, 0.5);
-  const s = ac.createBufferSource(), g = ac.createGain();
-  s.buffer = noiseBuf; g.gain.value = 0.25;
-  s.connect(g).connect(ac.destination); s.start();
+function toggleSound(k) {
+  sound[k] = !sound[k];
+  try { localStorage.setItem('boxing-duel-sound', JSON.stringify(sound)); } catch (_) {}
+  audio(); applySound();
+}
+
+const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+// One oscillator note with a quick attack and exponential decay.
+function note(bus, type, freq, t, dur, vol, slideTo = 0, filter = 0) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  let out = o;
+  if (filter) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filter; o.connect(f); out = f; }
+  out.connect(g).connect(bus);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+// Filtered noise burst: hits, hats, whooshes, crowd.
+function noise(bus, t, dur, vol, type, freq, freqTo = 0, q = 1) {
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = noiseBuf; s.loop = true;
+  f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+  if (freqTo) f.frequency.exponentialRampToValueAtTime(freqTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.02, dur / 3));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(bus);
+  s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+}
+
+function sfx(k, arg) {
+  if (!ac || !sound.sfx) return;
+  const t = ac.currentTime + 0.005, B = sfxBus;
+  switch (k) {
+    case 'whoosh': noise(B, t, 0.13, 0.25, 'bandpass', 900, 2600, 1.5); break;
+    case 'whooshBig': noise(B, t, 0.22, 0.35, 'bandpass', 500, 2200, 1.2); break;
+    case 'hit':
+      note(B, 'sine', 170, t, 0.16, 0.9, 50);
+      noise(B, t, 0.07, 0.5, 'lowpass', 2500, 400);
+      break;
+    case 'bigHit':
+      note(B, 'sine', 140, t, 0.3, 1, 35);
+      noise(B, t, 0.18, 0.6, 'lowpass', 3000, 300);
+      break;
+    case 'blk':
+      note(B, 'square', 950, t, 0.06, 0.12, 500, 3000);
+      noise(B, t, 0.04, 0.2, 'highpass', 3000);
+      break;
+    case 'ko':
+      note(B, 'sine', 120, t, 0.8, 1, 30);
+      noise(B, t, 0.35, 0.6, 'lowpass', 1800, 150);
+      cheer(t + 0.1, 2.2);
+      break;
+    case 'clash':
+      noise(B, t, 0.3, 0.5, 'bandpass', 1500, 300, 2);
+      note(B, 'sawtooth', 300, t, 0.25, 0.15, 80, 1500);
+      break;
+    case 'fire': // charge-up roar
+      noise(B, t, 0.4, 0.35, 'bandpass', 300, 1400, 2);
+      note(B, 'sawtooth', 110, t, 0.4, 0.12, 330, 1200);
+      break;
+    case 'dash':
+      note(B, 'square', 200, t, 0.3, 0.12, 900, 2000);
+      noise(B, t, 0.3, 0.3, 'bandpass', 600, 3000, 1.2);
+      break;
+    case 'dive':
+      note(B, 'square', 900, t, 0.3, 0.1, 180, 2000);
+      noise(B, t, 0.3, 0.3, 'bandpass', 2500, 500, 1.2);
+      break;
+    case 'fin':
+      [0, 4, 7, 12].forEach((s, i) => note(B, 'square', hz(72 + s), t + i * 0.05, 0.18, 0.08, 0, 4000));
+      break;
+    case 'jump': note(B, 'triangle', 300, t, 0.12, 0.12, 600); break;
+    case 'bell':
+      [1, 2.76, 5.4].forEach((m, i) => note(B, 'sine', 880 * m, t, 1.2 - i * 0.3, 0.25 / (i + 1)));
+      break;
+    case 'bells': for (let i = 0; i < 3; i++) [1, 2.76].forEach((m, j) => note(B, 'sine', 880 * m, t + i * 0.22, 0.5, 0.22 / (j + 1))); break;
+    case 'gong':
+      note(B, 'sine', 98, t, 1.6, 0.5, 92);
+      note(B, 'triangle', 196, t, 1.2, 0.2, 190);
+      noise(B, t, 0.5, 0.2, 'bandpass', 600, 200, 3);
+      cheer(t, 1.2, 0.12);
+      break;
+    case 'win':
+      [[60, 0], [64, 0.12], [67, 0.24], [72, 0.36], [67, 0.5], [72, 0.62]].forEach(([m, d], i) =>
+        note(B, 'square', hz(m + 12), t + d, i === 5 ? 0.7 : 0.14, 0.1, 0, 3500));
+      cheer(t, 2.5);
+      break;
+    case 'lose':
+      [[67, 0], [66, 0.2], [65, 0.4], [64, 0.6]].forEach(([m, d], i) =>
+        note(B, 'triangle', hz(m), t + d, i === 3 ? 0.9 : 0.22, 0.25, i === 3 ? hz(58) : 0));
+      break;
+    case 'click': note(B, 'triangle', 660, t, 0.06, 0.12); break;
+    case 'pick': note(B, 'square', hz(arg || 72), t, 0.12, 0.08, 0, 3000); break;
+  }
+}
+
+function cheer(t, dur, vol = 0.22) {
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = noiseBuf; s.loop = true;
+  f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 0.6;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.25);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(sfxBus);
+  s.start(t); s.stop(t + dur + 0.05);
+}
+
+// Music: a step sequencer that schedules a bit ahead of time. Two loops over Am–F–C–G:
+// 'fight' (fast drums, bass, arpeggio) and 'menu' (slow pads, soft beat).
+const music = { track: null, step: 0, next: 0, timer: null };
+const PROG = [[57, 'm'], [53, ''], [48, ''], [55, '']];
+const chordOf = bar => { const [r, q] = PROG[bar % 4]; return [r, r + (q ? 3 : 4), r + 7]; };
+
+function setTrack(name) {
+  if (music.track === name) return;
+  music.track = name; music.step = 0;
+  if (ac) music.next = ac.currentTime + 0.1;
+}
+
+function schedule() {
+  if (!ac || !music.track || ac.state !== 'running') return;
+  const fight = music.track === 'fight';
+  const len = 60 / (fight ? 138 : 92) / 4; // one 16th note
+  while (music.next < ac.currentTime + 0.12) {
+    if (sound.music) (fight ? fightStep : menuStep)(music.step, music.next, len);
+    music.next += len; music.step++;
+  }
+}
+
+function fightStep(s, t, len) {
+  const M = musicBus, i = s % 16, bar = Math.floor(s / 16), ch = chordOf(bar);
+  if (i === 0 || i === 8 || i === 10 || (i === 14 && bar % 2)) note(M, 'sine', 150, t, 0.18, 0.9, 42);
+  if (i === 4 || i === 12) { noise(M, t, 0.14, 0.35, 'bandpass', 1800, 900, 0.8); note(M, 'triangle', 190, t, 0.08, 0.2, 120); }
+  if (i % 2 === 0) noise(M, t, i % 4 === 2 ? 0.06 : 0.03, i % 4 === 2 ? 0.12 : 0.07, 'highpass', 7000);
+  if ([0, 3, 6, 8, 11, 14].includes(i)) note(M, 'sawtooth', hz(ch[0] - 24 + (i === 6 || i === 14 ? 12 : 0)), t, len * 1.8, 0.2, 0, 700);
+  const arp = [0, 1, 2, 1, 2, 0, 1, 2];
+  if (bar % 8 >= 4 && i % 2 === 0) note(M, 'square', hz(ch[arp[(i / 2) % 8]] + 12), t, len * 1.6, 0.045, 0, 2600);
+  if (bar % 8 < 4 && [0, 3, 6, 10, 12].includes(i)) note(M, 'square', hz(ch[[0, 2, 1, 2, 0][[0, 3, 6, 10, 12].indexOf(i)]] + 12), t, len * 2.5, 0.04, 0, 2200);
+}
+
+function menuStep(s, t, len) {
+  const M = musicBus, i = s % 16, bar = Math.floor(s / 16), ch = chordOf(bar);
+  if (i === 0) ch.forEach(m => note(M, 'triangle', hz(m), t, len * 15, 0.07));
+  if (i === 0 || i === 10) note(M, 'sine', hz(ch[0] - 24), t, len * 5, 0.22);
+  if (i === 0 || i === 8) note(M, 'sine', 120, t, 0.12, 0.35, 45);
+  if (i % 4 === 2) noise(M, t, 0.04, 0.05, 'highpass', 8000);
+  if ([0, 4, 6, 12].includes(i) && bar % 2) note(M, 'sine', hz(ch[[0, 4, 6, 12].indexOf(i) % 3] + 24), t, len * 3, 0.04);
 }
 
 // Floating words (special names, combo counts) are drawn unmirrored, so they read correctly on both phones.
@@ -555,7 +733,7 @@ function say(txt, x, y, col, size = 30, tag = null) {
 }
 
 function onEvent(e) {
-  sfx(e.k);
+  sfx(e.k === 'sp' ? e.s : e.k === 'hit' && e.big ? 'bigHit' : e.k);
   if (e.k === 'sp') { say(SPECIAL_NAMES[e.s], e.x, e.y, colorOf(e.w)); return; }
   if (e.k === 'fin') { say('סופר קומבו!', e.x, e.y - 30, '#ffc94a', 40); shake = 12; return; }
   sparks.push({ x: e.x, y: e.y, life: 1, k: e.k });
@@ -827,6 +1005,9 @@ $('#againBtn').onclick = () => { if (role === 'guest') send({ t: 'again' }); els
 $('#reselectBtn').onclick = () => { send({ t: 'reselect' }); openSelect(); };
 document.querySelectorAll('[data-menu]').forEach(b => { b.onclick = toMenu; });
 document.querySelectorAll('[data-screen]').forEach(b => { b.onclick = () => showScreen(b.dataset.screen); });
+document.querySelectorAll('[data-sound]').forEach(b => { b.onclick = () => toggleSound(b.dataset.sound); });
+document.addEventListener('click', e => { if (e.target.closest('.btn, .char')) sfx('click'); });
+applySound();
 
 // ---------- drawing ----------
 const cv = $('#c');
@@ -1099,6 +1280,8 @@ function updateHud() {
   const text = msgText(G.msg), key = text + (G.msg ? G.round : '');
   if (key !== bannerKey) {
     bannerKey = key;
+    const k = G.msg && G.msg.k;
+    if (k === 'round') sfx('bell'); else if (k === 'fight') sfx('gong'); else if (k === 'time') sfx('bells');
     const el = $('#banner');
     el.textContent = text;
     el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
@@ -1112,6 +1295,7 @@ function updateHud() {
     $('#overLead').hidden = !lead; $('#overLead').textContent = lead;
     releaseAll();
     showScreen('over');
+    sfx(won ? 'win' : 'lose');
   } else if (G.phase !== 'over' && !overEl.hidden) {
     showScreen(null);
   }
@@ -1125,7 +1309,15 @@ function render(dt, now) {
     f.px = f.x;
     f.moving = Math.abs(v) > 0.6 && f.y <= 0 ? 1 : 0;
     if (f.moving) f.walk += 0.22 * Math.abs(v);
+    // swing and jump sounds, from what the fighter is doing (works the same on host and guest)
+    if (role && f.act !== f.pa) {
+      if (f.act === 'punch') sfx('whoosh');
+      else if (f.act === 'kick' || f.act === 'finish') sfx('whooshBig');
+    }
+    if (role && f.act === 'idle' && f.y > 0 && !(f.py > 0)) sfx('jump');
+    f.pa = f.act; f.py = f.y;
   }
+  setTrack(role && !selecting && G && G.phase !== 'over' ? 'fight' : 'menu');
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const grd = ctx.createLinearGradient(0, 0, 0, ch);
@@ -1174,11 +1366,11 @@ requestAnimationFrame(loop);
 // considers the app not installed; getInstalledRelatedApps says whether it thinks it is.
 let installEvt = null;
 const inApp = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
-const note = t => { $('#installNote').textContent = t; $('#installNote').hidden = !t; };
+const installNote = t => { $('#installNote').textContent = t; $('#installNote').hidden = !t; };
 addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   installEvt = e;
-  $('#installBtn').hidden = false; note('');
+  $('#installBtn').hidden = false; installNote('');
 });
 $('#installBtn').onclick = async () => {
   if (!installEvt) return;
@@ -1186,10 +1378,10 @@ $('#installBtn').onclick = async () => {
   await installEvt.userChoice.catch(() => {});
   installEvt = null; $('#installBtn').hidden = true;
 };
-addEventListener('appinstalled', () => { $('#installBtn').hidden = true; note('הותקן! אפשר לפתוח את דו־קרב ממסך הבית.'); });
+addEventListener('appinstalled', () => { $('#installBtn').hidden = true; installNote('הותקן! אפשר לפתוח את דו־קרב ממסך הבית.'); });
 if (!inApp && navigator.getInstalledRelatedApps) {
   navigator.getInstalledRelatedApps().then(apps => {
-    if (apps.length && !installEvt) note('Chrome מדווח שהמשחק כבר מותקן בטלפון הזה. חפשו "דו־קרב" במגירת האפליקציות.');
+    if (apps.length && !installEvt) installNote('Chrome מדווח שהמשחק כבר מותקן בטלפון הזה. חפשו "דו־קרב" במגירת האפליקציות.');
   }).catch(() => {});
 }
 
