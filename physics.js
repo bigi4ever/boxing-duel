@@ -49,8 +49,9 @@ const PH = (() => {
     ground.createFixture(pl.Edge(V(-5, 0), V(15, 0)), { friction: 1 });
     ground.createFixture(pl.Edge(V(0.3, 0), V(0.3, 6)), { friction: 0.2 });
     ground.createFixture(pl.Edge(V(9.7, 0), V(9.7, 6)), { friction: 0.2 });
-    const W = { world, rag: [], hits: [], tick: 0 };
+    const W = { world, rag: [], hits: [], press: [], tick: 0, touch: false };
     world.on('begin-contact', c => onContact(W, c));
+    world.on('post-solve', (c, imp) => { if (W.touch) onPress(W, c, imp); });
     return W;
   }
 
@@ -94,20 +95,24 @@ const PH = (() => {
     return r;
   }
 
-  function newMatchWorld() {
+  // touch: the planning mode's rules — every touch on body or head hurts, and sustained pressure on the head
+  // can knock it clean off.
+  function newMatchWorld(opts = {}) {
     const W = makeWorld();
+    W.touch = !!opts.touch;
     buildRagdoll(W, 0, 3.6, 1);
     buildRagdoll(W, 1, 6.4, -1);
     return W;
   }
 
   // ---- muscles & balance ----
-  function angleOf(r, n) { return r.face * r.J[n].getJointAngle(); }
+  function angleOf(r, n) { return r.J[n] ? r.face * r.J[n].getJointAngle() : 0; }
 
   function drive(r) {
     const limp = r.ko ? 0.01 : r.stun > 0 ? 0.15 : 1;
     for (const n of JN) {
       const j = r.J[n];
+      if (!j) continue; // neck gone
       j.setMaxMotorTorque(JOINTS[n][5] * limp);
       const t = r.target[n] ?? 0;
       const err = t - angleOf(r, n);
@@ -131,6 +136,11 @@ const PH = (() => {
     if (r.moveDir && lowest < 0.4) {
       const v = t.getLinearVelocity();
       t.setLinearVelocity(V(v.x + (r.moveDir * 2.8 - v.x) * 0.3, v.y));
+      // feet planted in a pose (planning mode) hold the body back by friction: push the legs along too
+      if (Math.abs(v.x) < 2.6) for (const p of ['thigh0', 'thigh1', 'shin0', 'shin1']) {
+        const b = r.B[p];
+        b.applyForceToCenter(V(r.moveDir * b.getMass() * 34, 0), true);
+      }
     }
   }
 
@@ -156,9 +166,12 @@ const PH = (() => {
       const A = W.rag[h.atk], D = W.rag[h.def];
       if (!STRIKERS.has(h.part) || D.ko || !A.armed) continue;
       if ((A.cool[h.part] || 0) > W.tick) continue;
-      const over = h.rel - 3;
-      if (over <= 0) continue;
-      const dmg = Math.min(24, Math.round(over * 3.2 * (TAKES[h.dpart] || 0.3)));
+      const over = h.rel - (W.touch ? 1.5 : 3);
+      const vital = h.dpart === 'head' || h.dpart === 'torso';
+      // planning mode: even a slow touch on body (1) or head (2) counts
+      const touch = W.touch && vital ? (h.dpart === 'head' ? 2 : 1) : 0;
+      if (over <= 0 && !touch) continue;
+      const dmg = Math.max(touch, Math.min(24, Math.round(Math.max(0, over) * 3.2 * (TAKES[h.dpart] || 0.3))));
       if (dmg < 1) continue;
       A.cool[h.part] = W.tick + 14;
       D.hp = Math.max(0, D.hp - dmg);
@@ -175,6 +188,69 @@ const PH = (() => {
       out.push({ k: D.ko ? 'ko' : 'hit', w: h.def, x: h.x * SCALE, y: h.y, dmg, big, head: h.dpart === 'head' });
     }
     W.hits = [];
+    return out;
+  }
+
+  // ---- sustained pressure (planning mode) ----
+  // Which joints move each part: a part only presses while its muscles are still trying to go further
+  // (a guard held still doesn't hurt someone leaning into it). The head presses on a deliberate lean.
+  const MOVERS = { farm0: ['sh0', 'el0'], uarm0: ['sh0'], farm1: ['sh1', 'el1'], uarm1: ['sh1'],
+    shin0: ['hip0', 'kn0'], thigh0: ['hip0'], shin1: ['hip1', 'kn1'], thigh1: ['hip1'] };
+  function pushing(r, part) {
+    if (part === 'head') return r.lean >= 0.2;
+    const js = MOVERS[part];
+    return !!js && js.some(n => Math.abs((r.target[n] ?? 0) - angleOf(r, n)) > 0.25);
+  }
+  function onPress(W, c, imp) {
+    const fa = c.getFixtureA(), fb = c.getFixtureB();
+    const a = fa.getUserData(), b = fb.getUserData();
+    if (!a || !b || a.f === b.f) return;
+    const n = Math.max(...imp.normalImpulses);
+    if (!(n > 0)) return;
+    const wm = c.getWorldManifold(null);
+    const pt = wm && wm.points && wm.points[0] ? wm.points[0] : fa.getBody().getPosition();
+    for (const [def, by] of [[a, b], [b, a]]) {
+      if ((def.part === 'head' || def.part === 'torso') && pushing(W.rag[by.f], by.part)) W.press.push({ def: def.f, dpart: def.part, n, x: pt.x, y: pt.y });
+    }
+  }
+
+  const NECK_LIMIT = 8;      // accumulated head pressure (decaying) that snaps the neck: about a full move of hard pushing
+  function resolvePress(W) {
+    const out = [];
+    for (const r of W.rag) { r.neck = (r.neck || 0) * 0.97; r.pdmg = r.pdmg || 0; }
+    for (const p of W.press) {
+      const D = W.rag[p.def];
+      if (D.ko) continue;
+      const head = p.dpart === 'head';
+      D.pdmg += p.n * (head ? 1.2 : 0.6);
+      if (head) D.neck += p.n;
+      D.lastPress = p;
+    }
+    W.press = [];
+    for (const D of W.rag) {
+      if (D.ko) continue;
+      if (D.neck > NECK_LIMIT && D.J.neck) {
+        W.world.destroyJoint(D.J.neck);
+        D.J.neck = null; D.ko = true; D.hp = 0; D.headless = true;
+        // the head pops up and away; from now on it only meets the floor and walls, so nothing pins it
+        const h = D.B.head;
+        for (let f = h.getFixtureList(); f; f = f.getNext()) f.setFilterData({ groupIndex: -(D.i + 1), categoryBits: 8, maskBits: 1 });
+        h.setLinearVelocity(V(-D.face * 3, 8));
+        h.setAngularVelocity(-D.face * 9);
+        const q = h.getPosition();
+        out.push({ k: 'decap', w: D.i, x: q.x * SCALE, y: q.y, dmg: 0, big: true, head: true });
+        continue;
+      }
+      const whole = Math.floor(D.pdmg);
+      if (whole >= 1 && W.tick >= (D.pressShown || 0)) {
+        D.pdmg -= whole;
+        D.hp = Math.max(0, D.hp - whole);
+        D.pressShown = W.tick + 10;
+        const p = D.lastPress;
+        if (D.hp <= 0) D.ko = true;
+        out.push({ k: D.ko ? 'ko' : 'press', w: D.i, x: p.x * SCALE, y: p.y, dmg: whole, big: false, head: p.dpart === 'head' });
+      }
+    }
     return out;
   }
 
@@ -235,7 +311,7 @@ const PH = (() => {
 
   function currentAngles(r) {
     const t = {};
-    for (const n of JN) t[n] = angleOf(r, n);
+    for (const n of JN) if (r.J[n]) t[n] = angleOf(r, n);
     return t;
   }
 
@@ -270,7 +346,8 @@ const PH = (() => {
     }
     personalSpace(W);
     W.world.step(1 / 60, 8, 3);
-    return resolveHits(W);
+    const out = resolveHits(W);
+    return W.touch ? out.concat(resolvePress(W)) : out;
   }
 
   // Snapshot: per fighter, every part's x, y (pixels) and angle.

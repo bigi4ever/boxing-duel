@@ -681,6 +681,7 @@ function sfx(k, arg) {
       note(B, 'sine', 140, t, 0.3, 1, 35);
       noise(B, t, 0.18, 0.6, 'lowpass', 3000, 300);
       break;
+    case 'press': note(B, 'sine', 110, t, 0.08, 0.35, 70); break;
     case 'blk':
       note(B, 'square', 950, t, 0.06, 0.12, 500, 3000);
       noise(B, t, 0.04, 0.2, 'highpass', 3000);
@@ -795,14 +796,16 @@ function say(txt, x, y, col, size = 30, tag = null) {
 }
 
 function onEvent(e) {
-  sfx(e.k === 'sp' ? e.s : e.k === 'hit' && e.big ? 'bigHit' : e.k);
+  sfx(e.k === 'sp' ? e.s : e.k === 'hit' && e.big ? 'bigHit' : e.k === 'decap' ? 'ko' : e.k);
+  if (e.k === 'press') { sparks.push({ x: e.x, y: e.y, life: 0.6, k: 'blk' }); return; } // steady pushing: small and quiet
+  if (e.k === 'decap') say('הראש עף!', e.x, e.y - 50, '#ffc94a', 40);
   if (e.k === 'sp') { say(SPECIAL_NAMES[e.s], e.x, e.y, colorOf(e.w)); return; }
   if (e.k === 'fin') { say('סופר קומבו!', e.x, e.y - 30, '#ffc94a', 40); shake = 12; return; }
   sparks.push({ x: e.x, y: e.y, life: 1, k: e.k });
   if (e.k === 'blk') return;
-  shake = e.k === 'ko' ? 16 : e.big ? 10 : 6;
+  shake = e.k === 'decap' ? 22 : e.k === 'ko' ? 16 : e.big ? 10 : 6;
   if (e.n >= 2) say(e.n + ' מכות!', e.x, e.y - 60, '#ffc94a', 22 + Math.min(e.n, 6) * 3, 'combo' + e.w);
-  if (e.w === me && navigator.vibrate) navigator.vibrate(e.k === 'ko' ? 220 : e.big ? 90 : 40);
+  if (e.w === me && navigator.vibrate) navigator.vibrate(e.k === 'ko' || e.k === 'decap' ? 220 : e.big ? 90 : 40);
 }
 
 // ---------- input ----------

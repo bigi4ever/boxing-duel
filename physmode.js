@@ -15,7 +15,7 @@ let drag = null;
 
 // ---------- host / practice ----------
 function physStart() {
-  PW = PH.newMatchWorld();
+  PW = PH.newMatchWorld({ touch: mode === 'turns' });
   RV = PH.pack(PW);
   plans = [null, null];
   Object.assign(G, { tp: mode === 'turns' ? 'plan' : null, tt: TURN.PLAN, turn: 1, ready: [0, 0] });
