@@ -263,10 +263,54 @@ function drawPlan(now) {
 }
 
 // Called from render() for the physics modes.
+// ---------- blood when a head comes off ----------
+// Drops spray from the neck for about a second, fall, and leave stains on the mat until the next round.
+// Plain drawing on both phones (not physics), started by the 'decap' event.
+const blood = { from: [], drops: [], stains: [], round: 0 };
+let lastPhysFrame = 0;
+
+function startBlood(w) { blood.from.push({ w, until: performance.now() + 1100, head: performance.now() + 500 }); }
+
+function drawBlood(now) {
+  const dt = Math.min(0.05, (now - (lastPhysFrame || now)) / 1000);
+  lastPhysFrame = now;
+  if (G && G.round !== blood.round) { blood.round = G.round; blood.from = []; blood.drops = []; blood.stains = []; }
+  for (const s of blood.from) {
+    if (now > s.until) continue;
+    const torso = RV[s.w][0], head = RV[s.w][1];
+    const neck = at(torso, 27 * K());
+    const up = [-Math.sin(torso[2]), -Math.cos(torso[2])]; // up along the torso, on screen
+    const strength = (s.until - now) / 1100;
+    for (let n = 0; n < 5; n++) {
+      const sp = (380 + Math.random() * 380) * (0.5 + strength * 0.7);
+      blood.drops.push({ x: neck[0], y: neck[1], vx: up[0] * sp + (Math.random() - 0.5) * 220, vy: up[1] * sp + (Math.random() - 0.5) * 120, r: 2.5 + Math.random() * 3.5 });
+    }
+    if (now < s.head) { // a few from the head too
+      const h = at(head, -14 * K());
+      blood.drops.push({ x: h[0], y: h[1], vx: (Math.random() - 0.5) * 160, vy: Math.random() * 80, r: 2 + Math.random() * 2.5 });
+    }
+  }
+  blood.from = blood.from.filter(s => now <= s.until);
+  ctx.fillStyle = '#b3121f';
+  for (const st of blood.stains) {
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.ellipse(st.x, GROUND + 2, st.r * 2.2, st.r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  blood.drops = blood.drops.filter(d => {
+    d.vy += 1700 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+    if (d.y >= GROUND) { if (blood.stains.length < 140) blood.stains.push({ x: d.x, r: d.r }); return false; }
+    ctx.fillStyle = '#d0182a';
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
+    return d.x > -50 && d.x < W + 50;
+  });
+}
+
 function renderPhys(now) {
   if (role === 'guest') smoothRagdolls();
   if (!RV) return;
   drawRagdoll(0); drawRagdoll(1);
+  drawBlood(now);
   if (G && mode === 'turns') {
     if (G.tp === 'plan' && G.phase === 'fight' && (!myPlan || myPlan.turn !== G.turn)) { initPlan(); updateTurnPad(); }
     drawPlan(now);

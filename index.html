@@ -340,7 +340,7 @@ let outbox = [], sparks = [], texts = [], shake = 0, tick = 0;
 let score = [0, 0];       // matches won by each fighter since the room was opened (online only)
 
 // Health per fighter: the planning mode's fights are shorter.
-function maxHp() { return mode === 'turns' ? 100 : MAX_HP; }
+function maxHp() { return mode === 'turns' ? 150 : MAX_HP; }
 
 function newFighter(i, en = 0) {
   return { x: i ? 680 : 320, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, hp: maxHp(), en, act: 'idle', t: 0,
@@ -802,7 +802,7 @@ function say(txt, x, y, col, size = 30, tag = null) {
 function onEvent(e) {
   sfx(e.k === 'sp' ? e.s : e.k === 'hit' && e.big ? 'bigHit' : e.k === 'decap' ? 'ko' : e.k);
   if (e.k === 'press') { sparks.push({ x: e.x, y: e.y, life: 0.6, k: 'blk' }); return; } // steady pushing: small and quiet
-  if (e.k === 'decap') say('הראש עף!', e.x, e.y - 50, '#ffc94a', 40);
+  if (e.k === 'decap') { say('הראש עף!', e.x, e.y - 50, '#ffc94a', 40); startBlood(e.w); }
   if (e.k === 'sp') { say(SPECIAL_NAMES[e.s], e.x, e.y, colorOf(e.w)); return; }
   if (e.k === 'fin') { say('סופר קומבו!', e.x, e.y - 30, '#ffc94a', 40); shake = 12; return; }
   sparks.push({ x: e.x, y: e.y, life: 1, k: e.k });
