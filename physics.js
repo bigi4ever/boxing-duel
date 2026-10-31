@@ -268,12 +268,14 @@ const PH = (() => {
     const dir = (held & fwd ? 1 : 0) - (held & back ? 1 : 0);
     // a jump pressed mid-stride (a foot in the air) is kept for a moment and happens on the next step down
     if (taps & B.j) r.jumpBuf = 12;
+    else if (held & B.j) r.jumpBuf = Math.max(r.jumpBuf, 1); // held up: jump again on landing
     else if (r.jumpBuf > 0) r.jumpBuf--;
+    if (r.jumpCd > 0) r.jumpCd--;
     if (!r.act) {
       if (taps & B.p) { r.act = r.lastPunch === 'punch' ? 'punch2' : 'punch'; r.lastPunch = r.act; r.actT = 0; }
       else if (taps & B.k) { r.act = 'kick'; r.actT = 0; }
-      else if (r.jumpBuf > 0 && onGround) {
-        r.jumpBuf = 0;
+      else if (r.jumpBuf > 0 && onGround && !(r.jumpCd > 0)) {
+        r.jumpBuf = 0; r.jumpCd = 20; // feet are still low right after take-off
         // jumping while moving (joystick diagonal) takes off in that direction
         for (const p of PARTS) { const b = r.B[p], v = b.getLinearVelocity(); b.setLinearVelocity(V(dir ? dir * r.face * 2.8 : v.x, 6.2)); }
       }

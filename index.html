@@ -481,7 +481,7 @@ function updateFighter(f, o, held, latch) {
   if ((latch & BIT.s) && special(f, held)) { /* special started */ }
   else if (latch & BIT.p) startAttack(f, 'punch');
   else if (latch & BIT.k) startAttack(f, 'kick');
-  else if ((latch & BIT.j) && onGround && !f.blk) f.vy = 15;
+  else if (((latch | held) & BIT.j) && onGround && !f.blk) f.vy = 15; // held up: jump again on landing
   let dir = ((held & BIT.r) ? 1 : 0) - ((held & BIT.l) ? 1 : 0);
   if (f.blk || f.act !== 'idle') dir = 0;
   if (onGround && f.act === 'idle') f.vx = dir * 4.6;
@@ -856,8 +856,8 @@ document.querySelectorAll('.k[data-k]').forEach(el => {
 document.addEventListener('contextmenu', e => e.preventDefault());
 
 // Joystick → the same l / r / j keys as before: past a small dead zone sideways walks, up past a bit more jumps.
-// Directions come from where the finger really is (not the knob, which stops at the rim), so sliding up a little
-// while already pushed all the way sideways still jumps.
+// Directions come from where the finger really is (not the knob, which stops at the rim). Holding the stick up
+// (straight or diagonal) keeps jumping each time the fighter lands.
 {
   const stick = $('#stick'), knob = $('#knob'), R = 38;
   let id = null;
@@ -866,9 +866,11 @@ document.addEventListener('contextmenu', e => e.preventDefault());
     const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
     const d = Math.hypot(dx, dy), k = d > R ? R / d : 1;
     knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
-    press('l', dx < -R * 0.3 ? 1 : 0);
-    press('r', dx > R * 0.3 ? 1 : 0);
-    press('j', dy < -R * 0.35 ? 1 : 0);
+    // Up counts once the finger points more than ~25° above horizontal, so a gentle diagonal jumps too.
+    const out = d > R * 0.3;
+    press('l', out && dx < -R * 0.25 ? 1 : 0);
+    press('r', out && dx > R * 0.25 ? 1 : 0);
+    press('j', out && -dy > Math.abs(dx) * 0.47 ? 1 : 0);
   };
   const end = e => {
     if (e.pointerId !== id) return;
