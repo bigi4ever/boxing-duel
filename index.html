@@ -201,6 +201,7 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
     <h2>החדר שלך</h2>
     <div class="code" id="code">····</div>
     <p class="sub" id="hostWait">מתחבר…</p>
+    <a class="btn share" id="shareRoomBtn" target="_blank" rel="noopener" hidden>💬 שליחת הקוד בוואטסאפ</a>
     <p class="err" id="hostErr"></p>
     <button class="btn" data-menu>ביטול</button>
   </div>
@@ -919,6 +920,7 @@ function beginMatch() {
 function createRoom() {
   audio(); cleanupNet();
   showScreen('hostScr');
+  $('#shareRoomBtn').hidden = true;
   $('#code').textContent = '····'; $('#hostErr').textContent = ''; $('#hostWait').textContent = 'מתחבר…';
   if (!window.Peer) { $('#hostErr').textContent = 'רכיב החיבור לא נטען. בדקו את האינטרנט.'; return; }
   const code = String(1000 + Math.floor(Math.random() * 9000));
@@ -928,6 +930,10 @@ function createRoom() {
     if (peer !== p) return;
     $('#code').textContent = code;
     $('#hostWait').textContent = 'תנו לחבר את הקוד. מחכים שיצטרף…';
+    const join = new URL('./', location.href);
+    join.searchParams.set('room', code);
+    $('#shareRoomBtn').href = waLink(`בוא נתאגרף! 🥊 פתחתי חדר בדו־קרב.\nהקוד: ${code}\nלהצטרפות: ${join.href}`);
+    $('#shareRoomBtn').hidden = false;
   });
   p.on('connection', c => {
     if (peer !== p || (conn && conn.open)) { c.close(); return; }
@@ -1027,7 +1033,19 @@ document.querySelectorAll('[data-menu]').forEach(b => { b.onclick = toMenu; });
 document.querySelectorAll('[data-screen]').forEach(b => { b.onclick = () => showScreen(b.dataset.screen); });
 document.querySelectorAll('[data-sound]').forEach(b => { b.onclick = () => toggleSound(b.dataset.sound); });
 // Share the game's address on WhatsApp (opens the app on a phone, WhatsApp Web on a computer).
-$('#shareBtn').href = 'https://wa.me/?text=' + encodeURIComponent('בוא נתאגרף! 🥊 דו־קרב, משחק קרבות לשני טלפונים:\n' + new URL('./', location.href).href);
+const waLink = text => 'https://wa.me/?text=' + encodeURIComponent(text);
+$('#shareBtn').href = waLink('בוא נתאגרף! 🥊 דו־קרב, משחק קרבות לשני טלפונים:\n' + new URL('./', location.href).href);
+
+// Opened from a shared room link (?room=1234): go straight to joining with the code filled in.
+// One tap on "התחבר" is still needed, so sound and full screen can start.
+{
+  const room = new URLSearchParams(location.search).get('room');
+  if (/^\d{4}$/.test(room || '')) {
+    $('#codeIn').value = room;
+    showScreen('joinScr');
+    history.replaceState(null, '', location.pathname);
+  }
+}
 document.addEventListener('click', e => { if (e.target.closest('.btn, .char')) sfx('click'); });
 applySound();
 
