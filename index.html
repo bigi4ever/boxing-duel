@@ -762,21 +762,41 @@ function sfx(k, arg) {
         note(B, 'triangle', hz(m), t + d, i === 3 ? 0.9 : 0.22, 0.25, i === 3 ? hz(58) : 0));
       break;
     case 'click': note(B, 'triangle', 660, t, 0.06, 0.12); break;
+    case 'horn': // stadium air horn under the announcer, with the crowd going up
+      for (const [d, len] of [[0, 0.35], [0.45, 0.35], [0.9, 1.1]])
+        for (const f of [233, 294, 349]) note(B, 'sawtooth', f, t + d, len, 0.06, 0, 1800);
+      cheer(t, 3.5, 0.3);
+      break;
     case 'pick': note(B, 'square', hz(arg || 72), t, 0.12, 0.08, 0, 3000); break;
   }
 }
 
-// The announcer: the phone's own speech engine, in Hebrew. Off together with the sound effects.
+// The announcer: the phone's own speech engine, in Hebrew, as a deep, fast, excited stadium voice. Browsers don't
+// expose a voice's gender, so a male-named Hebrew voice is preferred when the phone has one, and the pitch is
+// pulled well down either way. The music dips while he speaks. Off together with the sound effects.
 function announce(text) {
   const tts = window.speechSynthesis;
   if (!sound.sfx || !tts || typeof SpeechSynthesisUtterance === 'undefined') return;
   try {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'he-IL'; u.rate = 0.95; u.pitch = 1.05; u.volume = 1;
-    const v = tts.getVoices().find(v => /^he|^iw/i.test(v.lang));
+    u.lang = 'he-IL'; u.rate = 1.12; u.pitch = 0.45; u.volume = 1;
+    const he = tts.getVoices().filter(v => /^(he|iw)/i.test(v.lang));
+    const v = he.find(v => /male|man|גבר|asaf|avri|david/i.test(v.name) && !/female/i.test(v.name)) || he[0];
     if (v) u.voice = v;
+    if (musicBus && sound.music) {
+      musicBus.gain.setTargetAtTime(0.12, ac.currentTime, 0.05);
+      u.onend = u.onerror = () => { if (sound.music) musicBus.gain.setTargetAtTime(0.5, ac.currentTime, 0.3); };
+    }
     tts.cancel(); tts.speak(u);
   } catch (_) {}
+}
+
+// Called the moment a match is decided, on both phones.
+let announced = false;
+function announceWinner() {
+  const w = G.wins[0] > G.wins[1] ? 0 : 1, name = charOf(w).name;
+  sfx('horn');
+  announce(`${G.msg && G.msg.k === 'ko' ? 'נוקאאוט!' : 'וזהו!'} ניצחון ל${name}! ${name}!`);
 }
 
 function cheer(t, dur, vol = 0.22) {
@@ -1499,6 +1519,9 @@ function updateHud() {
     el.textContent = text;
     el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
   }
+  // the match is decided: announce right away, not when the result screen comes
+  if (G.phase === 'intro' && G.round === 1) announced = false;
+  if (!announced && (G.phase === 'end' || G.phase === 'over') && Math.max(...G.wins) >= 2) { announced = true; announceWinner(); }
   const overEl = $('#over');
   if (G.phase === 'over' && overEl.hidden) {
     const won = G.wins[me] > G.wins[1 - me];
@@ -1509,8 +1532,6 @@ function updateHud() {
     releaseAll();
     showScreen('over');
     sfx(won ? 'win' : 'lose');
-    const winner = G.wins[0] > G.wins[1] ? 0 : 1;
-    setTimeout(() => announce(`ניצחון ל${charOf(winner).name}!`), 900);
   } else if (G.phase !== 'over' && !overEl.hidden) {
     showScreen(null);
   }
