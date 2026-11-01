@@ -140,6 +140,14 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 .k.on{background:#ffffff4d;transform:scale(.93)}
 .k.up{margin-bottom:0} /* one flat row under the fighters, like the planning mode */
 .k.big{width:62px;height:62px}
+/* Back to the menu, in the middle of the bottom row during a fight; asks once before leaving. */
+.quit{position:absolute;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);pointer-events:auto;
+  width:46px;height:46px;border-radius:50%;border:2px solid #fff9;background:#ffffff1f;color:#fff;cursor:pointer;padding:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font:500 9px var(--body)}
+.quit svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.quit b{font-weight:500;direction:rtl;unicode-bidi:isolate}
+.quit.ask{width:auto;padding:0 14px;border-radius:23px;background:var(--red);border-color:var(--red);font-size:14px}
+.quit.ask svg{display:none}
 /* Movement joystick: drag the knob; sideways walks, up jumps, diagonally up does both. */
 .stick{position:relative;width:108px;height:108px;border-radius:50%;border:2px solid #fff5;background:#ffffff12;touch-action:none;cursor:pointer;flex:none}
 .stick .knob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:#ffffff55;border:2px solid #fffa;box-shadow:0 2px 8px #0008;pointer-events:none}
@@ -176,6 +184,7 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 <div id="banner"></div>
 
 <div id="tpad" hidden>
+  <button class="quit" data-quit aria-label="חזרה לתפריט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v8.5h11V10"/></svg><b>תפריט</b></button>
   <div class="cluster">
     <div class="stick" id="tstick" aria-label="ג'ויסטיק: לאן לזוז במהלך הזה">
       <i class="hint l">◀</i><i class="hint r">▶</i><i class="hint u">▲</i>
@@ -189,6 +198,7 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 </div>
 
 <div id="pad" hidden>
+  <button class="quit" data-quit aria-label="חזרה לתפריט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v8.5h11V10"/></svg><b>תפריט</b></button>
   <div class="cluster">
     <div class="stick" id="stick" aria-label="ג'ויסטיק: גוררים לצדדים להליכה, למעלה לקפיצה">
       <i class="hint l">◀</i><i class="hint r">▶</i><i class="hint u">▲</i>
@@ -1277,6 +1287,16 @@ $('#exitBtn').onclick = () => {
     showScreen('bye');
   }, 250);
 };
+// Back to the menu mid-fight: the first tap asks, a second within 2.5 s leaves (online, the other phone is told).
+document.querySelectorAll('[data-quit]').forEach(b => {
+  let timer = null;
+  const label = b.querySelector('b');
+  b.onclick = () => {
+    if (b.classList.contains('ask')) { clearTimeout(timer); b.classList.remove('ask'); label.textContent = 'תפריט'; toMenu(); return; }
+    b.classList.add('ask'); label.textContent = 'לצאת?';
+    timer = setTimeout(() => { b.classList.remove('ask'); label.textContent = 'תפריט'; }, 2500);
+  };
+});
 $('#backBtn').onclick = () => { showScreen('menu'); try { if (ac) ac.resume(); } catch (_) {} };
 document.querySelectorAll('#modes .mode').forEach(b => {
   b.onclick = () => {
