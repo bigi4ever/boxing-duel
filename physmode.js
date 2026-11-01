@@ -51,7 +51,11 @@ function physTick(fight) {
 }
 
 function stepWorld() {
-  for (const e of PH.step(PW)) emit({ k: e.k, w: e.w, x: e.x, y: GROUND - e.y * PH.SCALE, big: e.big });
+  if (G.slow > 0 && G.slow-- % 2) return; // slow motion: the world moves every other tick
+  for (const e of PH.step(PW)) {
+    if (e.k === 'decap') { G.decap = true; G.slow = 120; } // about 2 s at half speed
+    emit({ k: e.k, w: e.w, x: e.x, y: GROUND - e.y * PH.SCALE, big: e.big });
+  }
   if (mode === 'phys' && G.phase === 'fight' && PW.tick % 120 === 0) regen(1); // recovery ability: 1 health per 2 s
 }
 

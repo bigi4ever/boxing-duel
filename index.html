@@ -387,7 +387,7 @@ function startRound() {
   F = [newFighter(0, F[0].en), newFighter(1, F[1].en)]; // energy carries over between rounds
   P = [];
   inp = [{ held: inp[0].held, latch: 0, age: 0 }, { held: inp[1].held, latch: 0, age: 0 }];
-  Object.assign(G, { phase: 'intro', t: 100, timer: 3600 });
+  Object.assign(G, { phase: 'intro', t: 100, timer: 3600, decap: false, slow: 0 });
   if (mode !== 'classic') physStart();
   setMsg({ k: 'round', n: G.round }, 60);
 }
@@ -582,8 +582,9 @@ function endRound() {
   if (ko0 !== ko1) w = ko0 ? 1 : 0;
   else if (!ko0 && F[0].hp !== F[1].hp) w = F[0].hp > F[1].hp ? 0 : 1;
   if (w >= 0) G.wins[w]++;
-  G.phase = 'end'; G.t = 150;
-  setMsg({ k: ko0 || ko1 ? 'ko' : 'time', w }, 120);
+  // a head knocked off gets time on screen (slow motion, the spurt, the head landing) before what comes next
+  G.phase = 'end'; G.t = G.decap ? 330 : 150;
+  setMsg({ k: ko0 || ko1 ? 'ko' : 'time', w }, G.decap ? 90 : 120);
 }
 
 function emit(e) {
@@ -763,6 +764,19 @@ function sfx(k, arg) {
     case 'click': note(B, 'triangle', 660, t, 0.06, 0.12); break;
     case 'pick': note(B, 'square', hz(arg || 72), t, 0.12, 0.08, 0, 3000); break;
   }
+}
+
+// The announcer: the phone's own speech engine, in Hebrew. Off together with the sound effects.
+function announce(text) {
+  const tts = window.speechSynthesis;
+  if (!sound.sfx || !tts || typeof SpeechSynthesisUtterance === 'undefined') return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'he-IL'; u.rate = 0.95; u.pitch = 1.05; u.volume = 1;
+    const v = tts.getVoices().find(v => /^he|^iw/i.test(v.lang));
+    if (v) u.voice = v;
+    tts.cancel(); tts.speak(u);
+  } catch (_) {}
 }
 
 function cheer(t, dur, vol = 0.22) {
@@ -1495,6 +1509,8 @@ function updateHud() {
     releaseAll();
     showScreen('over');
     sfx(won ? 'win' : 'lose');
+    const winner = G.wins[0] > G.wins[1] ? 0 : 1;
+    setTimeout(() => announce(`ניצחון ל${charOf(winner).name}!`), 900);
   } else if (G.phase !== 'over' && !overEl.hidden) {
     showScreen(null);
   }
