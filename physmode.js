@@ -295,7 +295,7 @@ function drawPlan(now) {
     const [x, y] = S([torso[0], torso[1] + 120]);
     ctx.fillStyle = '#ffc94a'; ctx.font = "26px 'Rubik', sans-serif"; ctx.textAlign = 'center';
     ctx.save(); ctx.translate(x, y); if (me === 1) ctx.scale(-1, 1);
-    ctx.fillText((myPlan.jump ? '⤒' : '') + (myPlan.move > 0 ? '→' : myPlan.move < 0 ? '←' : ''), 0, 0); // my fighter always faces right on my screen
+    ctx.fillText((myPlan.jump ? '↑' : '') + (myPlan.move > 0 ? '→' : myPlan.move < 0 ? '←' : ''), 0, 0); // my fighter always faces right on my screen
     ctx.restore();
   }
   ctx.restore();
