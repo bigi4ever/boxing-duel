@@ -67,6 +67,7 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 /* Sound switches and install sit beside the menu card, not in it, so the card fits a phone held sideways. */
 .corner{position:absolute;top:calc(10px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));display:flex;flex-direction:column;gap:6px;width:auto}
 .corner .btn{margin:0;width:auto;white-space:nowrap}
+.corner.left{right:auto;left:calc(10px + env(safe-area-inset-left))}
 .btn.share{border-color:#25d366;text-decoration:none;text-align:center}
 @media (max-width:820px){.corner .btn{font-size:13px;padding:7px 9px}}
 @media (max-height:440px){
@@ -201,6 +202,9 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
 </div>
 
 <section class="screen" id="menu">
+  <div class="corner left">
+    <button class="btn small" id="exitBtn">⏻ יציאה</button>
+  </div>
   <div class="corner">
     <button class="btn small" data-sound="music">🎵 מוזיקה</button>
     <button class="btn small" data-sound="sfx">🔊 צלילים</button>
@@ -285,6 +289,14 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
       <button class="btn" id="reselectBtn">החלפת לוחם</button>
       <button class="btn" data-menu>לתפריט</button>
     </div>
+  </div>
+</section>
+
+<section class="screen" id="bye" hidden>
+  <div class="card">
+    <h2>להתראות! 👋</h2>
+    <p class="sub">המשחק נעצר. כדי לסגור אותו לגמרי, פתחו את רשימת האפליקציות האחרונות של הטלפון והחליקו את דו־קרב החוצה.</p>
+    <button class="btn primary" id="backBtn">חזרה למשחק</button>
   </div>
 </section>
 
@@ -585,8 +597,8 @@ function endRound() {
   if (w >= 0) G.wins[w]++;
   // a head knocked off gets time on screen (slow motion, the spurt, the head landing) before what comes next
   G.phase = 'end'; G.t = G.decap ? 330 : 150;
-  // the knockout plays in slow motion (classic: third speed; physics: half speed, in physmode.js stepWorld)
-  if (mode !== 'turns' && (ko0 || ko1) && !G.decap) { G.slow = 120; G.t += 90; }
+  // the knockout plays in slow motion (classic: third speed; physics and planning: half speed, physmode.js stepWorld)
+  if ((ko0 || ko1) && !G.decap) { G.slow = 120; G.t += 90; }
   setMsg({ k: ko0 || ko1 ? 'ko' : 'time', w }, G.decap ? 90 : 120);
 }
 
@@ -651,7 +663,7 @@ addEventListener('pointerdown', audio, { capture: true });
 addEventListener('keydown', audio, { capture: true });
 document.addEventListener('visibilitychange', () => {
   if (!ac) return;
-  if (document.hidden) ac.suspend(); else ac.resume();
+  if (document.hidden) ac.suspend(); else if ($('#bye').hidden) ac.resume(); // stays quiet on the goodbye screen
 });
 
 function applySound() {
@@ -1249,6 +1261,21 @@ $('#reselectBtn').onclick = () => { send({ t: 'reselect' }); openSelect(); };
 document.querySelectorAll('[data-menu]').forEach(b => { b.onclick = toMenu; });
 document.querySelectorAll('[data-screen]').forEach(b => { b.onclick = () => showScreen(b.dataset.screen); });
 document.querySelectorAll('[data-sound]').forEach(b => { b.onclick = () => toggleSound(b.dataset.sound); });
+
+// Exit: a web app can only ask to close; when the phone won't let it (installed apps on Android usually don't),
+// everything stops — sound, full screen, any room — and a goodbye screen says how to finish closing.
+$('#exitBtn').onclick = () => {
+  cleanupNet();
+  try { window.close(); } catch (_) {}
+  setTimeout(() => {
+    if (window.closed) return;
+    try { if (ac) ac.suspend(); } catch (_) {}
+    try { speechSynthesis.cancel(); } catch (_) {}
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    showScreen('bye');
+  }, 250);
+};
+$('#backBtn').onclick = () => { showScreen('menu'); try { if (ac) ac.resume(); } catch (_) {} };
 document.querySelectorAll('#modes .mode').forEach(b => {
   b.onclick = () => {
     if (role === 'guest' || (typeof PH === 'undefined' || !PH) && b.dataset.mode !== 'classic') return;
