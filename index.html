@@ -398,6 +398,7 @@ function step() {
   tick++;
   const fight = G.phase === 'fight';
   if (mode !== 'classic') physTick(fight);
+  else if (G.slow > 0 && G.slow-- % 3) { /* knockout slow motion: the fighters move every third tick */ }
   else {
     if (role === 'solo') setHeld(1, fight ? botBits(F[1], F[0]) : 0);
     for (let i = 0; i < 2; i++) {
@@ -584,6 +585,7 @@ function endRound() {
   if (w >= 0) G.wins[w]++;
   // a head knocked off gets time on screen (slow motion, the spurt, the head landing) before what comes next
   G.phase = 'end'; G.t = G.decap ? 330 : 150;
+  if (mode === 'classic' && (ko0 || ko1)) { G.slow = 120; G.t += 90; } // the knockout plays in slow motion
   setMsg({ k: ko0 || ko1 ? 'ko' : 'time', w }, G.decap ? 90 : 120);
 }
 
