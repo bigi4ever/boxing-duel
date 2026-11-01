@@ -798,7 +798,7 @@ let announced = false;
 function announceWinner() {
   const w = G.wins[0] > G.wins[1] ? 0 : 1, name = charOf(w).name;
   sfx('horn');
-  announce(`${G.msg && G.msg.k === 'ko' ? 'נוקאאוט!' : 'וזהו!'} ניצחון ל${name}! ${name}!`);
+  announce(`${G.msg && G.msg.k === 'ko' ? 'נוקאאוט!' : 'וזהו!'} ניצחון ל${name}!`);
 }
 
 function cheer(t, dur, vol = 0.22) {
