@@ -585,7 +585,8 @@ function endRound() {
   if (w >= 0) G.wins[w]++;
   // a head knocked off gets time on screen (slow motion, the spurt, the head landing) before what comes next
   G.phase = 'end'; G.t = G.decap ? 330 : 150;
-  if (mode === 'classic' && (ko0 || ko1)) { G.slow = 120; G.t += 90; } // the knockout plays in slow motion
+  // the knockout plays in slow motion (classic: third speed; physics: half speed, in physmode.js stepWorld)
+  if (mode !== 'turns' && (ko0 || ko1) && !G.decap) { G.slow = 120; G.t += 90; }
   setMsg({ k: ko0 || ko1 ? 'ko' : 'time', w }, G.decap ? 90 : 120);
 }
 
@@ -798,7 +799,7 @@ let announced = false;
 function announceWinner() {
   const w = G.wins[0] > G.wins[1] ? 0 : 1, name = charOf(w).name;
   sfx('horn');
-  announce(`${G.msg && G.msg.k === 'ko' ? 'נוקאאוט!' : 'וזהו!'} ניצחון ל${name}!`);
+  announce(`ניצחון ל${name}!`);
 }
 
 function cheer(t, dur, vol = 0.22) {
