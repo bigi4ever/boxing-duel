@@ -609,7 +609,7 @@ function endRound() {
   if (w >= 0) G.wins[w]++;
   // a head knocked off gets time on screen (slow motion, the spurt, the head landing) before what comes next
   G.phase = 'end'; G.t = G.decap ? 330 : 150;
-  // the knockout plays in slow motion (classic: third speed; physics and planning: half speed, physmode.js stepWorld)
+  // the knockout plays in slow motion, a third of the speed (physics and planning: physmode.js stepWorld)
   if ((ko0 || ko1) && !G.decap) { G.slow = 120; G.t += 90; }
   setMsg({ k: ko0 || ko1 ? 'ko' : 'time', w }, G.decap ? 90 : 120);
 }

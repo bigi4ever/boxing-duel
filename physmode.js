@@ -51,7 +51,7 @@ function physTick(fight) {
 }
 
 function stepWorld() {
-  if (G.slow > 0 && G.slow-- % 2) return; // slow motion: the world moves every other tick
+  if (G.slow > 0 && G.slow-- % 3) return; // slow motion: the world moves every third tick
   for (const e of PH.step(PW)) {
     if (e.k === 'decap') { G.decap = true; G.slow = 120; } // about 2 s at half speed
     emit({ k: e.k, w: e.w, x: e.x, y: GROUND - e.y * PH.SCALE, big: e.big });
