@@ -1,7 +1,7 @@
 // Offline support for the installed app. Only this game's own files, the PeerJS script and the fonts are cached;
 // everything else (the PeerJS server's calls) always goes to the network.
 // Pages: network first, so a new version arrives on the next open; the cache is the offline fallback.
-const CACHE = 'boxing-duel-v31';
+const CACHE = 'boxing-duel-v32';
 const CORE = [
   './',
   './index.html',

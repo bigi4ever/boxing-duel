@@ -60,6 +60,8 @@ h2{font:400 26px/1.2 var(--display);margin:0 0 8px}
 .k.tbtn{width:46px;height:46px;font-size:10px;gap:0}
 .k.tbtn span{font-size:16px}
 .k.tbtn.on{background:#ffc94a55;border-color:var(--gold)}
+#tReset{border-color:var(--blue)}
+#tReset .ico{width:20px;height:20px;fill:none;stroke:var(--blue);stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;display:block}
 .btn.tready{width:auto;margin:0;padding:10px 16px;font-size:16px;pointer-events:auto}
 #tpad .cluster{gap:6px}
 body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode="turns"] .bar.en{display:none}
@@ -181,7 +183,7 @@ body[data-mode="phys"] .k.special,body[data-mode="phys"] .bar.en,body[data-mode=
     </div>
   </div>
   <div class="cluster">
-    <button class="k tbtn" id="tReset"><span>🔄</span>איפוס</button>
+    <button class="k tbtn" id="tReset"><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.2-5.1"/><path d="M5 4.5v4.6h4.6"/></svg></span>איפוס</button>
     <button class="btn primary tready" id="tReady">✔ מוכן</button>
   </div>
 </div>
