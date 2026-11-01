@@ -813,37 +813,65 @@ function cheer(t, dur, vol = 0.22) {
   s.start(t); s.stop(t + dur + 0.05);
 }
 
-// Music: a step sequencer that schedules a bit ahead of time. Two loops over Am–F–C–G:
-// 'fight' (fast drums, bass, arpeggio) and 'menu' (slow pads, soft beat).
-const music = { track: null, step: 0, next: 0, timer: null };
+// Music: a step sequencer that schedules a bit ahead of time, over Am–F–C–G. The fight has two tracks, and each
+// round picks one at random (each phone on its own): 'arena' (150 BPM, kick on every beat, pumping bass, chord
+// stabs, a roll into each phrase) and 'dnb' (170 BPM drum & bass, deep two-saw bass, fast arpeggio).
+// The menu and fighter picker have a calm loop.
+const music = { track: null, step: 0, next: 0, timer: null, fight: null };
 const PROG = [[57, 'm'], [53, ''], [48, ''], [55, '']];
 const chordOf = bar => { const [r, q] = PROG[bar % 4]; return [r, r + (q ? 3 : 4), r + 7]; };
 
+const FIGHT_TRACKS = {
+  arena: { bpm: 150, step(s, t, len) {
+    const M = musicBus, i = s % 16, bar = Math.floor(s / 16), ch = chordOf(bar), phrase = bar % 4;
+    if (i % 4 === 0) note(M, 'sine', 165, t, 0.22, 1, 40);
+    if (i === 4 || i === 12) { noise(M, t, 0.16, 0.42, 'bandpass', 1600, 1100, 0.9); noise(M, t + 0.012, 0.12, 0.25, 'bandpass', 2200, 1500, 1); }
+    if (i % 4 === 2) noise(M, t, 0.09, 0.16, 'highpass', 6500);
+    else noise(M, t, 0.025, 0.05, 'highpass', 9000);
+    if (i % 4 !== 0) note(M, 'sawtooth', hz(ch[0] - 24 + (i % 2 ? 12 : 0)), t, len * 0.8, 0.17, 0, 900);
+    if ([3, 6, 10, 14].includes(i) && bar % 2 === 0 || [3, 6, 11].includes(i) && bar % 2)
+      ch.forEach(m => note(M, 'square', hz(m + 12), t, len * 0.9, 0.035, 0, 2600));
+    const riff = [0, 3, 7, 10, 12, 10, 7, 3];
+    if (bar % 8 >= 4 && i % 2 === 0) note(M, 'square', hz(ch[0] + 12 + riff[(i / 2 + bar) % 8]), t, len * 1.5, 0.045, 0, 3200);
+    if (phrase === 3 && i >= 12) noise(M, t, 0.07, 0.18 + (i - 12) * 0.05, 'bandpass', 1800, 1200, 0.9);
+    if (phrase === 0 && i === 0 && bar > 0) noise(M, t, 0.9, 0.12, 'highpass', 5000, 9000);
+  } },
+  dnb: { bpm: 170, step(s, t, len) {
+    const M = musicBus, i = s % 16, bar = Math.floor(s / 16), ch = chordOf(Math.floor(bar / 2)), two = bar % 2;
+    if (i === 0 || i === 10 || (two && i === 7)) note(M, 'sine', 170, t, 0.2, 1, 38);
+    if (i === 4 || i === 12) { noise(M, t, 0.18, 0.45, 'bandpass', 1900, 1000, 0.8); note(M, 'triangle', 220, t, 0.08, 0.25, 140); }
+    if (i === 7 || i === 15) noise(M, t, 0.05, 0.12, 'bandpass', 2000, 1500, 0.8);
+    if (i % 2 === 0) noise(M, t, 0.03, i % 4 === 2 ? 0.09 : 0.05, 'highpass', 8000);
+    if (i === 0 || i === 8) {
+      note(M, 'sawtooth', hz(ch[0] - 24), t, len * 7.5, 0.16, 0, 500);
+      note(M, 'sawtooth', hz(ch[0] - 24) * 1.008, t, len * 7.5, 0.16, 0, 500);
+      note(M, 'sine', hz(ch[0] - 36), t, len * 7.5, 0.35);
+    }
+    const arp = [0, 1, 2, 1];
+    note(M, 'square', hz(ch[arp[i % 4]] + (i >= 8 ? 24 : 12)), t, len * 0.7, 0.03, 0, 3500);
+    if (bar % 4 === 3 && i >= 8 && i % 2) noise(M, t, 0.06, 0.2, 'bandpass', 2000, 1400, 0.8);
+  } },
+};
+
+// name: 'menu', or 'fight:<round>' so every new round starts a freshly picked track
 function setTrack(name) {
   if (music.track === name) return;
   music.track = name; music.step = 0;
+  if (name.startsWith('fight')) {
+    const names = Object.keys(FIGHT_TRACKS);
+    music.fight = FIGHT_TRACKS[names[Math.floor(Math.random() * names.length)]];
+  }
   if (ac) music.next = ac.currentTime + 0.1;
 }
 
 function schedule() {
   if (!ac || !music.track || ac.state !== 'running') return;
-  const fight = music.track === 'fight';
-  const len = 60 / (fight ? 138 : 92) / 4; // one 16th note
+  const fight = music.track.startsWith('fight') && music.fight;
+  const len = 60 / (fight ? fight.bpm : 92) / 4; // one 16th note
   while (music.next < ac.currentTime + 0.12) {
-    if (sound.music) (fight ? fightStep : menuStep)(music.step, music.next, len);
+    if (sound.music) (fight ? fight.step : menuStep)(music.step, music.next, len);
     music.next += len; music.step++;
   }
-}
-
-function fightStep(s, t, len) {
-  const M = musicBus, i = s % 16, bar = Math.floor(s / 16), ch = chordOf(bar);
-  if (i === 0 || i === 8 || i === 10 || (i === 14 && bar % 2)) note(M, 'sine', 150, t, 0.18, 0.9, 42);
-  if (i === 4 || i === 12) { noise(M, t, 0.14, 0.35, 'bandpass', 1800, 900, 0.8); note(M, 'triangle', 190, t, 0.08, 0.2, 120); }
-  if (i % 2 === 0) noise(M, t, i % 4 === 2 ? 0.06 : 0.03, i % 4 === 2 ? 0.12 : 0.07, 'highpass', 7000);
-  if ([0, 3, 6, 8, 11, 14].includes(i)) note(M, 'sawtooth', hz(ch[0] - 24 + (i === 6 || i === 14 ? 12 : 0)), t, len * 1.8, 0.2, 0, 700);
-  const arp = [0, 1, 2, 1, 2, 0, 1, 2];
-  if (bar % 8 >= 4 && i % 2 === 0) note(M, 'square', hz(ch[arp[(i / 2) % 8]] + 12), t, len * 1.6, 0.045, 0, 2600);
-  if (bar % 8 < 4 && [0, 3, 6, 10, 12].includes(i)) note(M, 'square', hz(ch[[0, 2, 1, 2, 0][[0, 3, 6, 10, 12].indexOf(i)]] + 12), t, len * 2.5, 0.04, 0, 2200);
 }
 
 function menuStep(s, t, len) {
@@ -1564,7 +1592,7 @@ function render(dt, now) {
     if (role && f.act === 'idle' && f.y > 0 && !(f.py > 0)) sfx('jump');
     f.pa = f.act; f.py = f.y;
   }
-  setTrack(role && !selecting && G && G.phase !== 'over' ? 'fight' : 'menu');
+  setTrack(role && !selecting && G && G.phase !== 'over' ? 'fight:' + G.round : 'menu');
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const grd = ctx.createLinearGradient(0, 0, 0, ch);
